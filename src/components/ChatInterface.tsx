@@ -183,9 +183,15 @@ const ChatInterface = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { cart, addToCart, removeFromCart, updateQuantity, getTotalPrice, getTotalItems } = useCart();
-  const [currentSessionId, setCurrentSessionId] = useState<string>('1');
-  const [showQuickActions, setShowQuickActions] = useState(true);
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>([
+  const [currentSessionId, setCurrentSessionId] = useState<string>(() => {
+    return sessionStorage.getItem('currentSessionId') || '1';
+  });
+  const [showQuickActions, setShowQuickActions] = useState(() => {
+    return sessionStorage.getItem('showQuickActions') !== 'false';
+  });
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => {
+    const saved = sessionStorage.getItem('chatSessions');
+    return saved ? JSON.parse(saved) : [
     {
       id: '1',
       title: 'Welcome Chat',
@@ -342,10 +348,23 @@ const ChatInterface = () => {
         }
       ]
     }
-  ]);
+  ]});
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("chat");
+
+  // Save state to sessionStorage to persist across navigation
+  useEffect(() => {
+    sessionStorage.setItem('currentSessionId', currentSessionId);
+  }, [currentSessionId]);
+
+  useEffect(() => {
+    sessionStorage.setItem('showQuickActions', showQuickActions.toString());
+  }, [showQuickActions]);
+
+  useEffect(() => {
+    sessionStorage.setItem('chatSessions', JSON.stringify(chatSessions));
+  }, [chatSessions]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -545,6 +564,11 @@ const ChatInterface = () => {
 
     setInputValue("");
     setIsLoading(true);
+    
+    // Hide quick actions after first user message
+    if (showQuickActions) {
+      setShowQuickActions(false);
+    }
 
     // Simulate AI processing time
     setTimeout(() => {

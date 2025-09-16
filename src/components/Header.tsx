@@ -9,7 +9,7 @@ const Header = () => {
   const navigate = useNavigate();
 
   return (
-    <header className="bg-card/95 backdrop-blur-sm border-b shadow-sm sticky top-0 z-50">
+    <header className="bg-card/95 backdrop-blur-sm border-b shadow-sm sticky top-0 z-50 supports-[backdrop-filter]:bg-card/80">
       <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
         <div className="flex items-center justify-between gap-2 sm:gap-4">
           {/* Logo */}
@@ -51,7 +51,7 @@ const Header = () => {
             >
               <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
               {getTotalItems() > 0 && (
-                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center text-[10px] font-medium">
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold border-2 border-background">
                   {getTotalItems() > 99 ? '99+' : getTotalItems()}
                 </span>
               )}
