@@ -751,6 +751,56 @@ const ChatInterface = () => {
         </div>
       </div>
 
+      {/* Quick Action Buttons - 2x2 Grid */}
+      {activeTab === "chat" && (
+        <div className="border-b bg-muted/20 px-3 sm:px-6 py-3">
+          <div className="max-w-4xl mx-auto">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-12 flex flex-col items-center justify-center gap-1 hover:bg-primary/10 border-primary/20 text-primary/80 hover:text-primary transition-all hover:scale-105"
+                onClick={() => handleSuggestionClick("Show me brake pads")}
+                disabled={isLoading}
+              >
+                <span className="text-lg">🔧</span>
+                <span className="text-xs font-medium">Brake Pads</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-12 flex flex-col items-center justify-center gap-1 hover:bg-primary/10 border-primary/20 text-primary/80 hover:text-primary transition-all hover:scale-105"
+                onClick={() => handleSuggestionClick("Engine oil options")}
+                disabled={isLoading}
+              >
+                <span className="text-lg">🛢️</span>
+                <span className="text-xs font-medium">Engine Oil</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-12 flex flex-col items-center justify-center gap-1 hover:bg-primary/10 border-primary/20 text-primary/80 hover:text-primary transition-all hover:scale-105"
+                onClick={() => handleSuggestionClick("LED headlights")}
+                disabled={isLoading}
+              >
+                <span className="text-lg">💡</span>
+                <span className="text-xs font-medium">Headlights</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-12 flex flex-col items-center justify-center gap-1 hover:bg-primary/10 border-primary/20 text-primary/80 hover:text-primary transition-all hover:scale-105"
+                onClick={() => handleSuggestionClick("Air filters")}
+                disabled={isLoading}
+              >
+                <span className="text-lg">🌪️</span>
+                <span className="text-xs font-medium">Air Filters</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
@@ -970,27 +1020,6 @@ const ChatInterface = () => {
       {/* Enhanced Input Area - Fixed/Sticky */}
       <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-card/95 backdrop-blur-md px-3 sm:px-4 py-3 sm:py-4 shadow-floating">
         <div className="max-w-4xl mx-auto">
-          {/* Dynamic Suggestion Buttons */}
-          {activeTab === "chat" && (
-            <div className="mb-3">
-              <div className="flex gap-2 flex-wrap">
-                {getDynamicSuggestions().map((suggestion, index) => (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    size="sm"
-                    className="h-8 px-3 text-xs font-medium hover:bg-primary/10 border-primary/20 text-primary/80 hover:text-primary flex items-center gap-1.5 transition-all hover:scale-105 hover:shadow-button"
-                    onClick={() => handleSuggestionClick(suggestion.text)}
-                    disabled={isLoading}
-                  >
-                    <span className="text-sm">{suggestion.icon}</span>
-                    <span>{suggestion.text}</span>
-                    <Zap className="w-3 h-3 opacity-50" />
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
           
           <div className="flex gap-2">
             <div className="flex-1 relative">
