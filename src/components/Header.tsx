@@ -1,11 +1,12 @@
 import { Search, ShoppingCart, User, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "@/components/CartContext";
 
 const Header = () => {
   const { getTotalItems } = useCart();
+  const navigate = useNavigate();
 
   return (
     <header className="bg-card/95 backdrop-blur-sm border-b shadow-sm sticky top-0 z-50">
@@ -42,10 +43,15 @@ const Header = () => {
             <Button variant="ghost" size="icon" className="hidden sm:flex">
               <User className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
-            <Button variant="ghost" size="icon" className="relative">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="relative"
+              onClick={() => navigate('/cart')}
+            >
               <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
               {getTotalItems() > 0 && (
-                <span className="absolute -top-1 -right-1 bg-kenya-red text-white text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center text-[10px] font-medium">
+                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center text-[10px] font-medium">
                   {getTotalItems() > 99 ? '99+' : getTotalItems()}
                 </span>
               )}

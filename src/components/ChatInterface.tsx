@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User, ShoppingCart, Star, Minus, Plus, X, ArrowLeft, History, Trash2, MessageSquare, Zap } from "lucide-react";
+import { Send, Bot, User, ShoppingCart, Star, Minus, Plus, X, ArrowLeft, History, Trash2, MessageSquare, Zap, Wrench, Droplets, Lightbulb, Wind } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useCart, Product } from "@/components/CartContext";
@@ -184,6 +184,7 @@ const ChatInterface = () => {
   const navigate = useNavigate();
   const { cart, addToCart, removeFromCart, updateQuantity, getTotalPrice, getTotalItems } = useCart();
   const [currentSessionId, setCurrentSessionId] = useState<string>('1');
+  const [showQuickActions, setShowQuickActions] = useState(true);
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([
     {
       id: '1',
@@ -345,7 +346,6 @@ const ChatInterface = () => {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("chat");
-  const [showQuickActions, setShowQuickActions] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -615,6 +615,7 @@ const ChatInterface = () => {
 
   const handleSuggestionClick = (suggestion: string) => {
     setInputValue(suggestion);
+    setShowQuickActions(false); // Hide quick actions after first use
     handleSendMessage();
   };
 
@@ -752,48 +753,56 @@ const ChatInterface = () => {
       </div>
 
       {/* Quick Action Buttons - 2x2 Grid */}
-      {activeTab === "chat" && (
-        <div className="border-b bg-muted/20 px-3 sm:px-6 py-3">
+      {activeTab === "chat" && showQuickActions && (
+        <div className="border-b bg-muted/20 px-3 sm:px-6 py-3 relative">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowQuickActions(false)}
+            className="absolute top-2 right-2 h-6 w-6 p-0 hover:bg-muted/50"
+          >
+            <X className="w-3 h-3" />
+          </Button>
           <div className="max-w-4xl mx-auto">
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <Button
                 variant="outline"
                 size="sm"
-                className="h-12 flex flex-col items-center justify-center gap-1 hover:bg-primary/10 border-primary/20 text-primary/80 hover:text-primary transition-all hover:scale-105"
+                className="h-14 flex flex-col items-center justify-center gap-1.5 hover:bg-primary/10 border-primary/20 text-primary/80 hover:text-primary transition-all hover:scale-105 group"
                 onClick={() => handleSuggestionClick("Show me brake pads")}
                 disabled={isLoading}
               >
-                <span className="text-lg">🔧</span>
+                <Wrench className="w-5 h-5 text-primary/70 group-hover:text-primary transition-colors" />
                 <span className="text-xs font-medium">Brake Pads</span>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-12 flex flex-col items-center justify-center gap-1 hover:bg-primary/10 border-primary/20 text-primary/80 hover:text-primary transition-all hover:scale-105"
+                className="h-14 flex flex-col items-center justify-center gap-1.5 hover:bg-primary/10 border-primary/20 text-primary/80 hover:text-primary transition-all hover:scale-105 group"
                 onClick={() => handleSuggestionClick("Engine oil options")}
                 disabled={isLoading}
               >
-                <span className="text-lg">🛢️</span>
+                <Droplets className="w-5 h-5 text-primary/70 group-hover:text-primary transition-colors" />
                 <span className="text-xs font-medium">Engine Oil</span>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-12 flex flex-col items-center justify-center gap-1 hover:bg-primary/10 border-primary/20 text-primary/80 hover:text-primary transition-all hover:scale-105"
+                className="h-14 flex flex-col items-center justify-center gap-1.5 hover:bg-primary/10 border-primary/20 text-primary/80 hover:text-primary transition-all hover:scale-105 group"
                 onClick={() => handleSuggestionClick("LED headlights")}
                 disabled={isLoading}
               >
-                <span className="text-lg">💡</span>
+                <Lightbulb className="w-5 h-5 text-primary/70 group-hover:text-primary transition-colors" />
                 <span className="text-xs font-medium">Headlights</span>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-12 flex flex-col items-center justify-center gap-1 hover:bg-primary/10 border-primary/20 text-primary/80 hover:text-primary transition-all hover:scale-105"
+                className="h-14 flex flex-col items-center justify-center gap-1.5 hover:bg-primary/10 border-primary/20 text-primary/80 hover:text-primary transition-all hover:scale-105 group"
                 onClick={() => handleSuggestionClick("Air filters")}
                 disabled={isLoading}
               >
-                <span className="text-lg">🌪️</span>
+                <Wind className="w-5 h-5 text-primary/70 group-hover:text-primary transition-colors" />
                 <span className="text-xs font-medium">Air Filters</span>
               </Button>
             </div>
