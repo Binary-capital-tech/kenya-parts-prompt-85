@@ -191,7 +191,19 @@ const ChatInterface = () => {
   });
   const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => {
     const saved = sessionStorage.getItem('chatSessions');
-    return saved ? JSON.parse(saved) : [
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Convert timestamp and lastActivity back to Date objects
+      return parsed.map((session: any) => ({
+        ...session,
+        lastActivity: new Date(session.lastActivity),
+        messages: session.messages.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }))
+      }));
+    }
+    return [
     {
       id: '1',
       title: 'Welcome Chat',
@@ -950,7 +962,7 @@ const ChatInterface = () => {
                     )}
                     
                     <span className="text-xs text-muted-foreground mt-1">
-                      {message.timestamp.toLocaleTimeString()}
+                      {new Date(message.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
 
@@ -1016,9 +1028,9 @@ const ChatInterface = () => {
                               {session.messages.length} messages
                             </p>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <span>Last activity: {session.lastActivity.toLocaleDateString()}</span>
+                              <span>Last activity: {new Date(session.lastActivity).toLocaleDateString()}</span>
                               <span>•</span>
-                              <span>{session.lastActivity.toLocaleTimeString()}</span>
+                              <span>{new Date(session.lastActivity).toLocaleTimeString()}</span>
                             </div>
                           </div>
                           <div className="flex gap-1">
