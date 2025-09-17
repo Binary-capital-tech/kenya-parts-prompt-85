@@ -51,7 +51,7 @@ const Header = () => {
             >
               <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
               {getTotalItems() > 0 && (
-                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center text-[10px] font-medium">
+                <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center text-[10px] font-medium">
                   {getTotalItems() > 99 ? '99+' : getTotalItems()}
                 </span>
               )}

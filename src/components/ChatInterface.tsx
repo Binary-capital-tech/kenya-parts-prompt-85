@@ -456,18 +456,33 @@ const ChatInterface = () => {
   const simulateAIResponse = (userMessage: string): { content: string; products?: Product[] } => {
     const message = userMessage.toLowerCase();
     
+    // Handle navigation requests
+    if (message.includes('go to cart') || message.includes('navigate to cart') || message.includes('take me to cart') || message.includes('open cart')) {
+      navigate('/cart');
+      return {
+        content: "Taking you to your cart now! 🛒"
+      };
+    }
+    
+    if (message.includes('go to checkout') || message.includes('navigate to checkout') || message.includes('take me to checkout') || message.includes('proceed to checkout') || message.includes('checkout now')) {
+      navigate('/checkout');
+      return {
+        content: "Redirecting you to checkout! 💳"
+      };
+    }
+    
     // Handle cart request
     if (message.includes('cart') || message.includes('shopping cart') || message.includes('my cart')) {
       if (cart.length === 0) {
         return {
-          content: "Your cart is currently empty! 🛒\n\nStart shopping by asking me about auto parts you need. For example:\n• 'Show me brake pads for Toyota Corolla'\n• 'I need headlights for Honda Civic'\n• 'Find engine oil for BMW'\n\nI'll help you find the perfect parts for your vehicle!"
+          content: "Your cart is currently empty! 🛒\n\nStart shopping by asking me about auto parts you need. For example:\n• 'Show me brake pads for Toyota Corolla'\n• 'I need headlights for Honda Civic'\n• 'Find engine oil for BMW'\n\nI'll help you find the perfect parts for your vehicle!\n\n💡 **Quick Commands:**\n• Say 'go to cart' to view your cart\n• Say 'go to checkout' to proceed to checkout"
         };
       } else {
         const cartItems = cart.map(item => `• ${item.name} - ${item.price} (Qty: ${item.quantity})`).join('\n');
         const totalPrice = getTotalPrice();
         
         return {
-          content: `Here's what's in your cart: 🛒\n\n${cartItems}\n\n**Total: $${totalPrice.toFixed(2)}**\n\nReady to checkout or need to add more items?`
+          content: `Here's what's in your cart: 🛒\n\n${cartItems}\n\n**Total: $${totalPrice.toFixed(2)}**\n\nReady to checkout or need to add more items?\n\n💡 **Quick Commands:**\n• Say 'go to cart' to view your cart\n• Say 'go to checkout' to proceed to checkout`
         };
       }
     }
