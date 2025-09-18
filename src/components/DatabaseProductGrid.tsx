@@ -4,10 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Star, ShoppingCart, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
-import { useCart } from "./CartContext";
+import { useCart, Product } from "./CartContext";
 import { useToast } from "@/hooks/use-toast";
 
-interface Product {
+interface DatabaseProduct {
   id: string;
   name: string;
   price: number;
@@ -25,10 +25,10 @@ interface ProductImage {
   is_primary: boolean;
 }
 
-const ProductGrid = () => {
+const DatabaseProductGrid = () => {
   const { addToCart } = useCart();
   const { toast } = useToast();
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<DatabaseProduct[]>([]);
   const [productImages, setProductImages] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
@@ -77,13 +77,17 @@ const ProductGrid = () => {
     }
   };
 
-  const handleAddToCart = (product: Product) => {
-    addToCart({
+  const handleAddToCart = (product: DatabaseProduct) => {
+    const cartProduct: Product = {
       id: product.id,
       name: product.name,
       price: product.sale_price || product.price,
-      image: productImages[product.id] || '/src/assets/hero-parts.jpg'
-    });
+      image: productImages[product.id] || '/src/assets/hero-parts.jpg',
+      brand: product.brand,
+      inStock: product.stock_quantity > 0
+    };
+
+    addToCart(cartProduct);
     
     toast({
       title: "Added to cart!",
@@ -235,4 +239,4 @@ const ProductGrid = () => {
   );
 };
 
-export default ProductGrid;
+export default DatabaseProductGrid;
