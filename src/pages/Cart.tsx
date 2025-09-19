@@ -108,7 +108,7 @@ const Cart = () => {
                         <div className="text-right">
                           <p className="font-semibold text-foreground">{item.price}</p>
                           <p className="text-sm text-muted-foreground">
-                            KSh {(parseFloat(item.price.replace(/[^\d.]/g, '')) * item.quantity).toLocaleString()} total
+                            ${(parseFloat(item.price.replace('$', '')) * item.quantity).toFixed(2)} total
                           </p>
                         </div>
                       </div>
