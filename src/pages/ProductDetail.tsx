@@ -14,7 +14,7 @@ import oilsImage from "@/assets/oils.jpg";
 // Sample product data that matches the chat interface
 const sampleProducts: { [key: string]: Product } = {
   "1": {
-    id: 1,
+    id: "1",
     name: "Premium Brake Disc & Pads Set",
     brand: "Brembo",
     price: "KSh 8,500",

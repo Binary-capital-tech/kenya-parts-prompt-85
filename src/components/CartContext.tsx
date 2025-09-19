@@ -4,8 +4,8 @@ export interface Product {
   id: string;
   name: string;
   brand?: string;
-  price: number;
-  originalPrice?: number;
+  price: string;
+  originalPrice?: string;
   image: string;
   rating?: number;
   description?: string;
@@ -76,7 +76,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const getTotalPrice = () => {
     return cart.reduce((total, item) => {
-      return total + (item.price * item.quantity);
+      const price = parseFloat(item.price.replace(/[^\d.]/g, ''));
+      return total + (price * item.quantity);
     }, 0);
   };
 
