@@ -79,9 +79,9 @@ const ProductGrid = () => {
 
   const handleAddToCart = (product: Product) => {
     addToCart({
-      id: product.id,
+      id: product.id.toString(),
       name: product.name,
-      price: product.sale_price || product.price,
+      price: `KSh ${(product.sale_price || product.price).toLocaleString()}`,
       image: productImages[product.id] || '/src/assets/hero-parts.jpg'
     });
     
