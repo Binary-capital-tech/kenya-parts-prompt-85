@@ -14,11 +14,11 @@ import oilsImage from "@/assets/oils.jpg";
 // Sample product data that matches the chat interface
 const sampleProducts: { [key: string]: Product } = {
   "1": {
-    id: 1,
+    id: "1",
     name: "Premium Brake Disc & Pads Set",
     brand: "Brembo",
-    price: "KSh 8,500",
-    originalPrice: "KSh 12,000",
+    price: 8500,
+    originalPrice: 12000,
     image: brakePartsImage,
     rating: 4.8,
     description: "High-performance brake discs and pads for excellent stopping power and durability. Engineered for European vehicles with superior ceramic compound technology.",
@@ -26,11 +26,11 @@ const sampleProducts: { [key: string]: Product } = {
     inStock: true
   },
   "2": {
-    id: 2,
+    id: "2",
     name: "High Performance Air Filter",
     brand: "K&N",
-    price: "KSh 2,800",
-    originalPrice: "KSh 3,500",
+    price: 2800,
+    originalPrice: 3500,
     image: airFilterImage,
     rating: 4.7,
     description: "Reusable high-flow air filter for improved performance and engine protection. Washable and designed to last up to 50,000 miles.",
@@ -38,10 +38,10 @@ const sampleProducts: { [key: string]: Product } = {
     inStock: true
   },
   "3": {
-    id: 3,
+    id: "3",
     name: "LED Headlight Assembly",
     brand: "Philips",
-    price: "KSh 15,500",
+    price: 15500,
     image: headlightImage,
     rating: 4.9,
     description: "Premium LED headlight with excellent brightness and longevity. 6000K color temperature for clear white light.",
@@ -49,10 +49,10 @@ const sampleProducts: { [key: string]: Product } = {
     inStock: true
   },
   "4": {
-    id: 4,
+    id: "4",
     name: "Full Synthetic Engine Oil",
     brand: "Mobil 1",
-    price: "KSh 6,200",
+    price: 6200,
     image: oilsImage,
     rating: 4.8,
     description: "Premium full synthetic motor oil for maximum protection and performance in all driving conditions.",
@@ -60,10 +60,10 @@ const sampleProducts: { [key: string]: Product } = {
     inStock: true
   },
   "11": {
-    id: 11,
+    id: "11",
     name: "Ceramic Brake Pads",
     brand: "Akebono",
-    price: "KSh 4,200",
+    price: 4200,
     image: brakePartsImage,
     rating: 4.6,
     description: "Low-dust ceramic brake pads for quiet operation and excellent stopping power.",
@@ -71,10 +71,10 @@ const sampleProducts: { [key: string]: Product } = {
     inStock: true
   },
   "21": {
-    id: 21,
+    id: "21",
     name: "OEM Air Filter",
     brand: "Mann Filter",
-    price: "KSh 1,500",
+    price: 1500,
     image: airFilterImage,
     rating: 4.5,
     description: "Original equipment quality air filter for optimal engine protection.",
@@ -82,10 +82,10 @@ const sampleProducts: { [key: string]: Product } = {
     inStock: true
   },
   "31": {
-    id: 31,
+    id: "31",
     name: "Halogen Headlight Bulbs",
     brand: "Osram",
-    price: "KSh 2,400",
+    price: 2400,
     image: headlightImage,
     rating: 4.4,
     description: "High-quality halogen bulbs for standard headlights with enhanced brightness.",
@@ -93,10 +93,10 @@ const sampleProducts: { [key: string]: Product } = {
     inStock: true
   },
   "41": {
-    id: 41,
+    id: "41",
     name: "Conventional Motor Oil",
     brand: "Castrol",
-    price: "KSh 3,800",
+    price: 3800,
     image: oilsImage,
     rating: 4.5,
     description: "High-quality conventional motor oil for everyday driving protection.",
@@ -244,15 +244,15 @@ const ProductDetail = () => {
 
               {/* Price */}
               <div className="flex items-center gap-4 mb-6">
-                <span className="text-3xl font-bold text-primary">{product.price}</span>
+                <span className="text-3xl font-bold text-primary">KSh {product.price.toLocaleString()}</span>
                 {product.originalPrice && (
                   <span className="text-lg text-muted-foreground line-through">
-                    {product.originalPrice}
+                    KSh {product.originalPrice.toLocaleString()}
                   </span>
                 )}
                 {product.originalPrice && (
                   <Badge className="bg-red-100 text-red-800 border-red-200">
-                    Save {Math.round(((parseInt(product.originalPrice.replace(/[^\d]/g, '')) - parseInt(product.price.replace(/[^\d]/g, ''))) / parseInt(product.originalPrice.replace(/[^\d]/g, ''))) * 100)}%
+                    Save {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
                   </Badge>
                 )}
               </div>

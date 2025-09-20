@@ -35,11 +35,11 @@ interface ChatSession {
 const sampleProducts = {
   brake: [
     {
-      id: 1,
+      id: "1",
       name: "Premium Brake Disc & Pads Set",
       brand: "Brembo",
-      price: "KSh 8,500",
-      originalPrice: "KSh 12,000",
+      price: 8500,
+      originalPrice: 12000,
       image: brakePartsImage,
       rating: 4.8,
       description: "High-performance brake discs and pads for excellent stopping power",
@@ -47,10 +47,10 @@ const sampleProducts = {
       inStock: true
     },
     {
-      id: 11,
+      id: "11",
       name: "Ceramic Brake Pads",
       brand: "Akebono",
-      price: "KSh 4,200",
+      price: 4200,
       image: brakePartsImage,
       rating: 4.6,
       description: "Low-dust ceramic brake pads for quiet operation",
@@ -58,11 +58,11 @@ const sampleProducts = {
       inStock: true
     },
     {
-      id: 12,
+      id: "12",
       name: "Sports Brake Discs",
       brand: "EBC",
-      price: "KSh 6,800",
-      originalPrice: "KSh 8,500",
+      price: 6800,
+      originalPrice: 8500,
       image: brakePartsImage,
       rating: 4.9,
       description: "Slotted and drilled brake discs for enhanced cooling",
@@ -72,11 +72,11 @@ const sampleProducts = {
   ],
   filter: [
     {
-      id: 2,
+      id: "2",
       name: "High Performance Air Filter",
       brand: "K&N",
-      price: "KSh 2,800",
-      originalPrice: "KSh 3,500",
+      price: 2800,
+      originalPrice: 3500,
       image: airFilterImage,
       rating: 4.7,
       description: "Reusable high-flow air filter for improved performance",
@@ -84,10 +84,10 @@ const sampleProducts = {
       inStock: true
     },
     {
-      id: 21,
+      id: "21",
       name: "OEM Air Filter",
       brand: "Mann Filter",
-      price: "KSh 1,500",
+      price: 1500,
       image: airFilterImage,
       rating: 4.5,
       description: "Original equipment quality air filter",
@@ -95,10 +95,10 @@ const sampleProducts = {
       inStock: true
     },
     {
-      id: 22,
+      id: "22",
       name: "Carbon Cabin Filter",
       brand: "Bosch",
-      price: "KSh 3,200",
+      price: 3200,
       image: airFilterImage,
       rating: 4.8,
       description: "Activated carbon cabin air filter for clean air",
@@ -108,10 +108,10 @@ const sampleProducts = {
   ],
   headlight: [
     {
-      id: 3,
+      id: "3",
       name: "LED Headlight Assembly",
       brand: "Philips",
-      price: "KSh 15,500",
+      price: 15500,
       image: headlightImage,
       rating: 4.9,
       description: "Premium LED headlight with excellent brightness and longevity",
@@ -119,10 +119,10 @@ const sampleProducts = {
       inStock: true
     },
     {
-      id: 31,
+      id: "31",
       name: "Halogen Headlight Bulbs",
       brand: "Osram",
-      price: "KSh 2,400",
+      price: 2400,
       image: headlightImage,
       rating: 4.4,
       description: "High-quality halogen bulbs for standard headlights",
@@ -130,11 +130,11 @@ const sampleProducts = {
       inStock: true
     },
     {
-      id: 32,
+      id: "32",
       name: "HID Xenon Kit",
       brand: "Hella",
-      price: "KSh 8,900",
-      originalPrice: "KSh 11,500",
+      price: 8900,
+      originalPrice: 11500,
       image: headlightImage,
       rating: 4.7,
       description: "Complete HID conversion kit for brighter lighting",
@@ -144,10 +144,10 @@ const sampleProducts = {
   ],
   oil: [
     {
-      id: 4,
+      id: "4",
       name: "Full Synthetic Engine Oil",
       brand: "Mobil 1",
-      price: "KSh 6,200",
+      price: 6200,
       image: oilsImage,
       rating: 4.8,
       description: "Premium full synthetic motor oil for maximum protection",
@@ -155,10 +155,10 @@ const sampleProducts = {
       inStock: true
     },
     {
-      id: 41,
+      id: "41",
       name: "Conventional Motor Oil",
       brand: "Castrol",
-      price: "KSh 3,800",
+      price: 3800,
       image: oilsImage,
       rating: 4.5,
       description: "High-quality conventional motor oil for everyday driving",
@@ -166,10 +166,10 @@ const sampleProducts = {
       inStock: true
     },
     {
-      id: 42,
+      id: "42",
       name: "Transmission Fluid",
       brand: "Valvoline",
-      price: "KSh 4,500",
+      price: 4500,
       image: oilsImage,
       rating: 4.6,
       description: "Premium automatic transmission fluid for smooth shifting",

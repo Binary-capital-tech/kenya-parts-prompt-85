@@ -106,9 +106,9 @@ const Cart = () => {
                           </Button>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold text-foreground">{item.price}</p>
+                          <p className="font-semibold text-foreground">KSh {item.price.toLocaleString()}</p>
                           <p className="text-sm text-muted-foreground">
-                            ${(parseFloat(item.price.replace('$', '')) * item.quantity).toFixed(2)} total
+                            KSh {(item.price * item.quantity).toLocaleString()} total
                           </p>
                         </div>
                       </div>
@@ -129,20 +129,20 @@ const Cart = () => {
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span>Subtotal ({getTotalItems()} items)</span>
-                    <span>${getTotalPrice().toFixed(2)}</span>
+                    <span>KSh {getTotalPrice().toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Shipping</span>
-                    <span>$10.00</span>
+                    <span>KSh 500</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Tax</span>
-                    <span>$0.00</span>
+                    <span>KSh 0</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total</span>
-                    <span>${(getTotalPrice() + 10).toFixed(2)}</span>
+                    <span>KSh {(getTotalPrice() + 500).toLocaleString()}</span>
                   </div>
                 </div>
                 
