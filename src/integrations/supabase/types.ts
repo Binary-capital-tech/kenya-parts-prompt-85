@@ -157,6 +157,71 @@ export type Database = {
           },
         ]
       }
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          message_type: string
+          metadata: Json | null
+          session_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          message_type: string
+          metadata?: Json | null
+          session_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          message_type?: string
+          metadata?: Json | null
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_sessions: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          phone: string | null
+          title: string
+          updated_at: string
+          user_token: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          phone?: string | null
+          title: string
+          updated_at?: string
+          user_token?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          phone?: string | null
+          title?: string
+          updated_at?: string
+          user_token?: string | null
+        }
+        Relationships: []
+      }
       coupon_usage: {
         Row: {
           coupon_id: string | null
@@ -333,6 +398,62 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mpesa_payments: {
+        Row: {
+          amount: number
+          checkout_request_id: string | null
+          created_at: string
+          id: string
+          merchant_request_id: string | null
+          mpesa_receipt_number: string | null
+          order_id: string | null
+          phone_number: string
+          result_code: number | null
+          result_desc: string | null
+          status: string
+          transaction_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          checkout_request_id?: string | null
+          created_at?: string
+          id?: string
+          merchant_request_id?: string | null
+          mpesa_receipt_number?: string | null
+          order_id?: string | null
+          phone_number: string
+          result_code?: number | null
+          result_desc?: string | null
+          status?: string
+          transaction_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          checkout_request_id?: string | null
+          created_at?: string
+          id?: string
+          merchant_request_id?: string | null
+          mpesa_receipt_number?: string | null
+          order_id?: string | null
+          phone_number?: string
+          result_code?: number | null
+          result_desc?: string | null
+          status?: string
+          transaction_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -1040,6 +1161,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      execute_controlled_query: {
+        Args: { query_params?: Json; query_type: string }
+        Returns: Json
+      }
       generate_order_number: {
         Args: Record<PropertyKey, never>
         Returns: string

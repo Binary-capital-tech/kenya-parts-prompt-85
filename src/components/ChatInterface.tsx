@@ -453,38 +453,130 @@ const ChatInterface = () => {
     });
   };
 
-  const simulateAIResponse = (userMessage: string): { content: string; products?: Product[] } => {
+  const simulateAIResponse = async (userMessage: string): Promise<{ content: string; products?: Product[] }> => {
     const message = userMessage.toLowerCase();
     
-    // Handle navigation requests
-    if (message.includes('go to cart') || message.includes('navigate to cart') || message.includes('take me to cart') || message.includes('open cart')) {
-      navigate('/cart');
-      return {
-        content: "Taking you to your cart now! 🛒"
-      };
-    }
-    
-    if (message.includes('go to checkout') || message.includes('navigate to checkout') || message.includes('take me to checkout') || message.includes('proceed to checkout') || message.includes('checkout now')) {
-      navigate('/checkout');
-      return {
-        content: "Redirecting you to checkout! 💳"
-      };
-    }
-    
-    // Handle cart request
-    if (message.includes('cart') || message.includes('shopping cart') || message.includes('my cart')) {
-      if (cart.length === 0) {
-        return {
-          content: "Your cart is currently empty! 🛒\n\nStart shopping by asking me about auto parts you need. For example:\n• 'Show me brake pads for Toyota Corolla'\n• 'I need headlights for Honda Civic'\n• 'Find engine oil for BMW'\n\nI'll help you find the perfect parts for your vehicle!\n\n💡 **Quick Commands:**\n• Say 'go to cart' to view your cart\n• Say 'go to checkout' to proceed to checkout"
-        };
-      } else {
-        const cartItems = cart.map(item => `• ${item.name} - ${item.price} (Qty: ${item.quantity})`).join('\n');
-        const totalPrice = getTotalPrice();
+    try {
+      // Call Gemini AI backend with MCP
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gemini-chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          message: userMessage,
+          sessionId: currentSessionId,
+          userToken: `token_${Date.now()}`,
+          email: 'kalphaxide@gmail.com',
+          phone: '+254722000000'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // If we have tool results with products, format them
+      if (data.toolResults && data.toolResults.length > 0) {
+        const productResults = data.toolResults.find((result: any) => 
+          result.tool === 'search_products' || result.tool === 'get_products'
+        );
         
+        if (productResults && Array.isArray(productResults.result)) {
+          const products = productResults.result.map((product: any) => ({
+            id: product.id.toString(),
+            name: product.name,
+            brand: product.brand,
+            price: product.price,
+            image: brakePartsImage, // Default image for now
+            rating: product.rating,
+            description: product.description,
+            category: product.category,
+            inStock: product.inStock
+          }));
+          
+          return {
+            content: data.response,
+            products: products
+          };
+        }
+      }
+      
+      return {
+        content: data.response || "I'm here to help you find auto parts! What specific parts are you looking for?"
+      };
+      
+    } catch (error) {
+      console.error('AI Response error:', error);
+      
+      // Fallback to local logic
+      // Handle navigation requests
+      if (message.includes('go to cart') || message.includes('navigate to cart') || message.includes('take me to cart') || message.includes('open cart')) {
+        navigate('/cart');
         return {
-          content: `Here's what's in your cart: 🛒\n\n${cartItems}\n\n**Total: $${totalPrice.toFixed(2)}**\n\nReady to checkout or need to add more items?\n\n💡 **Quick Commands:**\n• Say 'go to cart' to view your cart\n• Say 'go to checkout' to proceed to checkout`
+          content: "Taking you to your cart now! 🛒"
         };
       }
+      
+      if (message.includes('go to checkout') || message.includes('navigate to checkout') || message.includes('take me to checkout') || message.includes('proceed to checkout') || message.includes('checkout now')) {
+        navigate('/checkout');
+        return {
+          content: "Redirecting you to checkout! 💳"
+        };
+      }
+      
+      // Handle cart request
+      if (message.includes('cart') || message.includes('shopping cart') || message.includes('my cart')) {
+        if (cart.length === 0) {
+          return {
+            content: "Your cart is currently empty! 🛒\n\nStart shopping by asking me about auto parts you need. For example:\n• 'Show me brake pads for Toyota Corolla'\n• 'I need headlights for Honda Civic'\n• 'Find engine oil for BMW'\n\nI'll help you find the perfect parts for your vehicle!\n\n💡 **Quick Commands:**\n• Say 'go to cart' to view your cart\n• Say 'go to checkout' to proceed to checkout"
+          };
+        } else {
+          const cartItems = cart.map(item => `• ${item.name} - KSh ${item.price.toLocaleString()} (Qty: ${item.quantity})`).join('\n');
+          const totalPrice = getTotalPrice();
+          
+          return {
+            content: `Here's what's in your cart: 🛒\n\n${cartItems}\n\n**Total: KSh ${totalPrice.toLocaleString()}**\n\nReady to checkout or need to add more items?\n\n💡 **Quick Commands:**\n• Say 'go to cart' to view your cart\n• Say 'go to checkout' to proceed to checkout`
+          };
+        }
+      }
+      
+      // Handle product search with fallback
+      if (message.includes('brake')) {
+        return {
+          content: "I found some excellent brake parts for you:",
+          products: sampleProducts.brake
+        };
+      }
+      
+      if (message.includes('filter') || message.includes('air')) {
+        return {
+          content: "Here are some great air filter options:",
+          products: sampleProducts.filter
+        };
+      }
+      
+      if (message.includes('headlight') || message.includes('light')) {
+        return {
+          content: "Check out these headlight options:",
+          products: sampleProducts.headlight
+        };
+      }
+      
+      if (message.includes('oil') || message.includes('engine')) {
+        return {
+          content: "Here are premium oil options for your vehicle:",
+          products: sampleProducts.oil
+        };
+      }
+      
+      // Default response
+      return {
+        content: "I'm here to help you find auto parts! What specific parts are you looking for your vehicle? I can help you find brake pads, air filters, headlights, engine oil, and more."
+      };
     }
     
     // Handle invoice request with example
@@ -503,14 +595,14 @@ const ChatInterface = () => {
           postalCode: "00100"
         },
         product: {
-          id: 1,
+          id: "1",
           name: "Premium Brake Disc & Pads Set",
           brand: "Brembo",
-          price: 85.00,
+          price: 8500,
           image: brakePartsImage,
           category: "Brake System"
         },
-        total: 95.00
+        total: 9000
       };
       
       // Navigate to invoice page with example data
@@ -519,7 +611,7 @@ const ChatInterface = () => {
       }, 1000);
       
       return {
-        content: "Here's an example invoice for your reference. I'm generating a sample invoice now to show you the format and details we provide for all orders. This includes customer information, order details, pricing breakdown, and payment terms."
+        content: "Here's an example invoice for your reference. I'm generating a sample invoice now to show you the format and details we provide for all orders."
       };
     }
     
@@ -1142,6 +1234,26 @@ const ChatInterface = () => {
               <span className="hidden sm:inline">new line</span>
             </div>
           </div>
+        </div>
+        
+        {/* Chat Action Buttons */}
+        <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+          <Button
+            onClick={() => navigate('/cart')}
+            className="flex-1 bg-primary hover:bg-primary/90"
+            size="sm"
+          >
+            <ShoppingCart className="w-4 h-4 mr-2" />
+            Go to Cart {getTotalItems() > 0 && `(${getTotalItems()})`}
+          </Button>
+          <Button
+            onClick={() => navigate('/invoice')}
+            variant="outline"
+            className="flex-1"
+            size="sm"
+          >
+            Download Invoice
+          </Button>
         </div>
       </div>
     </div>
