@@ -1,382 +1,391 @@
-import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Star, ShoppingCart, Heart, Share2, ArrowLeft, Plus, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { useCart } from "@/components/CartContext";
 import { useToast } from "@/hooks/use-toast";
-import { useCart, Product } from "@/components/CartContext";
-import { ArrowLeft, Star, ShoppingCart, Heart, Share2, Truck, Shield, RotateCcw } from "lucide-react";
-import brakePartsImage from "@/assets/brake-parts.jpg";
-import headlightImage from "@/assets/headlight.jpg";
-import airFilterImage from "@/assets/air-filter.jpg";
-import oilsImage from "@/assets/oils.jpg";
+import { supabase } from "@/integrations/supabase/client";
 
-// Sample product data that matches the chat interface
-const sampleProducts: { [key: string]: Product } = {
-  "1": {
-    id: "1",
-    name: "Premium Brake Disc & Pads Set",
-    brand: "Brembo",
-    price: 8500,
-    originalPrice: 12000,
-    image: brakePartsImage,
-    rating: 4.8,
-    description: "High-performance brake discs and pads for excellent stopping power and durability. Engineered for European vehicles with superior ceramic compound technology.",
-    category: "Brake System",
-    inStock: true
-  },
-  "2": {
-    id: "2",
-    name: "High Performance Air Filter",
-    brand: "K&N",
-    price: 2800,
-    originalPrice: 3500,
-    image: airFilterImage,
-    rating: 4.7,
-    description: "Reusable high-flow air filter for improved performance and engine protection. Washable and designed to last up to 50,000 miles.",
-    category: "Engine",
-    inStock: true
-  },
-  "3": {
-    id: "3",
-    name: "LED Headlight Assembly",
-    brand: "Philips",
-    price: 15500,
-    image: headlightImage,
-    rating: 4.9,
-    description: "Premium LED headlight with excellent brightness and longevity. 6000K color temperature for clear white light.",
-    category: "Lighting",
-    inStock: true
-  },
-  "4": {
-    id: "4",
-    name: "Full Synthetic Engine Oil",
-    brand: "Mobil 1",
-    price: 6200,
-    image: oilsImage,
-    rating: 4.8,
-    description: "Premium full synthetic motor oil for maximum protection and performance in all driving conditions.",
-    category: "Fluids",
-    inStock: true
-  },
-  "11": {
-    id: "11",
-    name: "Ceramic Brake Pads",
-    brand: "Akebono",
-    price: 4200,
-    image: brakePartsImage,
-    rating: 4.6,
-    description: "Low-dust ceramic brake pads for quiet operation and excellent stopping power.",
-    category: "Brake System",
-    inStock: true
-  },
-  "21": {
-    id: "21",
-    name: "OEM Air Filter",
-    brand: "Mann Filter",
-    price: 1500,
-    image: airFilterImage,
-    rating: 4.5,
-    description: "Original equipment quality air filter for optimal engine protection.",
-    category: "Engine",
-    inStock: true
-  },
-  "31": {
-    id: "31",
-    name: "Halogen Headlight Bulbs",
-    brand: "Osram",
-    price: 2400,
-    image: headlightImage,
-    rating: 4.4,
-    description: "High-quality halogen bulbs for standard headlights with enhanced brightness.",
-    category: "Lighting",
-    inStock: true
-  },
-  "41": {
-    id: "41",
-    name: "Conventional Motor Oil",
-    brand: "Castrol",
-    price: 3800,
-    image: oilsImage,
-    rating: 4.5,
-    description: "High-quality conventional motor oil for everyday driving protection.",
-    category: "Fluids",
-    inStock: true
-  }
-};
+interface Product {
+  id: string;
+  name: string;
+  brand?: string;
+  price: number;
+  sale_price?: number;
+  description?: string;
+  rating: number;
+  total_reviews: number;
+  stock_quantity: number;
+  sku: string;
+  weight?: number;
+  warranty_period?: string;
+  tags?: string[];
+  is_featured: boolean;
+  is_active: boolean;
+}
+
+interface ProductImage {
+  image_url: string;
+  alt_text?: string;
+  is_primary: boolean;
+}
 
 const ProductDetail = () => {
   const { productId } = useParams();
+  const navigate = useNavigate();
+  const { addToCart } = useCart();
   const { toast } = useToast();
-  const { addToCart, getTotalItems } = useCart();
+  
+  const [product, setProduct] = useState<Product | null>(null);
+  const [productImages, setProductImages] = useState<ProductImage[]>([]);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [loading, setLoading] = useState(true);
 
-  const product = sampleProducts[productId as string];
+  useEffect(() => {
+    if (productId) {
+      fetchProduct();
+    }
+  }, [productId]);
 
-  if (!product) {
+  const fetchProduct = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch product details
+      const { data: productData, error: productError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .eq('is_active', true)
+        .single();
+
+      if (productError) throw productError;
+
+      if (productData) {
+        setProduct(productData);
+        
+        // Fetch product images
+        const { data: imagesData, error: imagesError } = await supabase
+          .from('product_images')
+          .select('image_url, alt_text, is_primary')
+          .eq('product_id', productId)
+          .order('is_primary', { ascending: false })
+          .order('sort_order', { ascending: true });
+
+        if (!imagesError && imagesData) {
+          setProductImages(imagesData);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching product:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load product details. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddToCart = () => {
+    if (!product) return;
+    
+    for (let i = 0; i < selectedQuantity; i++) {
+      addToCart({
+        id: product.id,
+        name: product.name,
+        price: product.sale_price || product.price,
+        image: productImages[selectedImageIndex]?.image_url || '/src/assets/hero-parts.jpg'
+      });
+    }
+    
+    toast({
+      title: "Added to cart!",
+      description: `${selectedQuantity}x ${product.name} added to your cart.`,
+    });
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-4">Product Not Found</h1>
-          <p className="text-muted-foreground mb-6">The product you're looking for doesn't exist.</p>
-          <Link to="/">
-            <Button variant="outline">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Chat
-            </Button>
-          </Link>
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-300 rounded w-32 mb-6"></div>
+            <div className="grid lg:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <div className="h-96 bg-gray-300 rounded-lg"></div>
+                <div className="flex gap-2">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="h-20 w-20 bg-gray-300 rounded-lg"></div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="h-8 bg-gray-300 rounded w-3/4"></div>
+                <div className="h-6 bg-gray-300 rounded w-1/2"></div>
+                <div className="h-4 bg-gray-300 rounded w-full"></div>
+                <div className="h-4 bg-gray-300 rounded w-full"></div>
+                <div className="h-12 bg-gray-300 rounded w-full"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  const handleAddToCart = () => {
-    for (let i = 0; i < selectedQuantity; i++) {
-      addToCart(product);
-    }
-    toast({
-      title: "Added to cart",
-      description: `${selectedQuantity}x ${product.name} added to your cart.`,
-    });
-  };
+  if (!product) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Product Not Found</h1>
+          <p className="text-muted-foreground mb-6">The product you're looking for doesn't exist or has been removed.</p>
+          <Button onClick={() => navigate('/')}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Home
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
-  const features = [
-    "High-quality materials and construction",
-    "OEM equivalent or better performance",
-    "Easy installation with detailed instructions",
-    "Comprehensive warranty coverage",
-    "Tested for durability and reliability"
-  ];
-
-  const specifications = {
-    "Part Number": `AS${product.id.toString().padStart(4, '0')}`,
-    "Brand": product.brand,
-    "Category": product.category,
-    "Compatibility": "Universal fit (check vehicle manual)",
-    "Warranty": "2 years or 24,000 miles"
-  };
+  const currentImage = productImages[selectedImageIndex]?.image_url || '/src/assets/hero-parts.jpg';
+  const isOnSale = product.sale_price && product.sale_price < product.price;
+  const finalPrice = product.sale_price || product.price;
+  const originalPrice = isOnSale ? product.price : null;
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6">
-        {/* Header with Back Button */}
-        <div className="flex items-center gap-4 mb-6">
-          <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-            <span>Back to Chat</span>
-          </Link>
-          <div className="h-6 w-px bg-border" />
-          <h1 className="text-xl font-bold text-primary">autospares</h1>
-          {getTotalItems() > 0 && (
-            <>
-              <div className="h-6 w-px bg-border" />
-              <Badge variant="secondary">{getTotalItems()} items in cart</Badge>
-            </>
-          )}
-        </div>
+      <div className="container mx-auto px-4 py-8">
+        {/* Back Button */}
+        <Button 
+          variant="ghost" 
+          onClick={() => navigate(-1)}
+          className="mb-6 hover:bg-muted"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back
+        </Button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
-          {/* Product Image */}
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+          {/* Product Images */}
           <div className="space-y-4">
-            <div className="aspect-square rounded-lg overflow-hidden bg-card shadow-sm border">
+            <div className="relative aspect-square bg-card rounded-lg overflow-hidden border">
               <img
-                src={product.image}
+                src={currentImage}
                 alt={product.name}
-                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                className="w-full h-full object-cover"
               />
+              {isOnSale && (
+                <Badge className="absolute top-4 left-4 bg-destructive text-destructive-foreground">
+                  Sale
+                </Badge>
+              )}
             </div>
             
-            {/* Product Features */}
-            <Card className="lg:hidden">
-              <CardHeader>
-                <CardTitle className="text-lg">Key Features</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {features.map((feature, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm">
-                      <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
+            {/* Thumbnail Images */}
+            {productImages.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {productImages.map((img, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedImageIndex(index)}
+                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${
+                      selectedImageIndex === index 
+                        ? 'border-primary' 
+                        : 'border-border hover:border-muted-foreground'
+                    }`}
+                  >
+                    <img
+                      src={img.image_url}
+                      alt={img.alt_text || product.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Product Details */}
+          {/* Product Info */}
           <div className="space-y-6">
-            {/* Product Info */}
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <Badge variant="secondary" className="text-sm">{product.category}</Badge>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary">
+              <h1 className="text-3xl font-bold text-foreground mb-2">
+                {product.name}
+              </h1>
+              {product.brand && (
+                <p className="text-lg text-muted-foreground">by {product.brand}</p>
+              )}
+            </div>
+
+            {/* Rating */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center">
+                {[...Array(5)].map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`w-5 h-5 ${
+                      i < Math.floor(product.rating)
+                        ? "text-yellow-400 fill-current"
+                        : "text-gray-300"
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {product.rating} ({product.total_reviews} reviews)
+              </span>
+            </div>
+
+            {/* Price */}
+            <div className="space-y-2">
+              <div className="flex items-baseline gap-3">
+                <span className="text-3xl font-bold text-primary">
+                  KSh {finalPrice.toLocaleString()}
+                </span>
+                {originalPrice && (
+                  <span className="text-xl text-muted-foreground line-through">
+                    KSh {originalPrice.toLocaleString()}
+                  </span>
+                )}
+              </div>
+              {isOnSale && originalPrice && (
+                <Badge variant="destructive" className="text-sm">
+                  Save {Math.round(((originalPrice - finalPrice) / originalPrice) * 100)}%
+                </Badge>
+              )}
+            </div>
+
+            {/* Stock Status */}
+            <div className="flex items-center gap-2 mb-6">
+              {product.stock_quantity > 0 ? (
+                <>
+                  <div className="w-3 h-3 bg-success rounded-full"></div>
+                  <span className="text-success-foreground font-medium">In Stock</span>
+                  <span className="text-sm text-muted-foreground">
+                    ({product.stock_quantity} available)
+                  </span>
+                </>
+              ) : (
+                <>
+                  <div className="w-3 h-3 bg-destructive rounded-full"></div>
+                  <span className="text-destructive font-medium">Out of Stock</span>
+                </>
+              )}
+            </div>
+
+            {/* Description */}
+            {product.description && (
+              <div>
+                <h3 className="font-semibold mb-2">Description</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  {product.description}
+                </p>
+              </div>
+            )}
+
+            {/* Product Details */}
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <h3 className="font-semibold">Product Details</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">SKU:</span>
+                    <span className="ml-2 font-medium">{product.sku}</span>
+                  </div>
+                  {product.weight && (
+                    <div>
+                      <span className="text-muted-foreground">Weight:</span>
+                      <span className="ml-2 font-medium">{product.weight}kg</span>
+                    </div>
+                  )}
+                  {product.warranty_period && (
+                    <div>
+                      <span className="text-muted-foreground">Warranty:</span>
+                      <span className="ml-2 font-medium">{product.warranty_period}</span>
+                    </div>
+                  )}
+                  {product.brand && (
+                    <div>
+                      <span className="text-muted-foreground">Brand:</span>
+                      <span className="ml-2 font-medium">{product.brand}</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Tags */}
+            {product.tags && product.tags.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-2">Tags</h3>
+                <div className="flex flex-wrap gap-2">
+                  {product.tags.map((tag, index) => (
+                    <Badge key={index} variant="secondary" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Separator />
+
+            {/* Quantity Selector and Add to Cart */}
+            {product.stock_quantity > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <span className="font-medium">Quantity:</span>
+                  <div className="flex items-center border rounded-lg">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedQuantity(Math.max(1, selectedQuantity - 1))}
+                      className="h-10 w-10 p-0"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </Button>
+                    <span className="px-4 py-2 font-medium min-w-[3rem] text-center">
+                      {selectedQuantity}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedQuantity(Math.min(product.stock_quantity, selectedQuantity + 1))}
+                      className="h-10 w-10 p-0"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleAddToCart}
+                    size="lg"
+                    className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
+                  >
+                    <ShoppingCart className="w-5 h-5 mr-2" />
+                    Add to Cart
+                  </Button>
+                  <Button variant="outline" size="lg">
                     <Heart className="w-5 h-5" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary">
+                  <Button variant="outline" size="lg">
                     <Share2 className="w-5 h-5" />
                   </Button>
                 </div>
-              </div>
-              
-              <h1 className="text-3xl font-bold text-foreground mb-2">{product.name}</h1>
-              <p className="text-lg text-muted-foreground mb-4">by {product.brand}</p>
-              
-              {/* Rating */}
-              <div className="flex items-center gap-4 mb-6">
-                <div className="flex items-center gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`w-5 h-5 ${
-                        i < Math.floor(product.rating)
-                          ? 'text-yellow-400 fill-current'
-                          : 'text-gray-300'
-                      }`}
-                    />
-                  ))}
-                  <span className="text-sm text-muted-foreground ml-2">
-                    {product.rating} rating
-                  </span>
-                </div>
-              </div>
 
-              {/* Price */}
-              <div className="flex items-center gap-4 mb-6">
-                <span className="text-3xl font-bold text-primary">KSh {product.price.toLocaleString()}</span>
-                {product.originalPrice && (
-                  <span className="text-lg text-muted-foreground line-through">
-                    KSh {product.originalPrice.toLocaleString()}
-                  </span>
-                )}
-                {product.originalPrice && (
-                  <Badge className="bg-red-100 text-red-800 border-red-200">
-                    Save {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
-                  </Badge>
-                )}
+                <p className="text-sm text-muted-foreground">
+                  Total: KSh {(finalPrice * selectedQuantity).toLocaleString()}
+                </p>
               </div>
-
-              {/* Stock Status */}
-              <div className="flex items-center gap-2 mb-6">
-                {product.inStock ? (
-                  <>
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <span className="text-green-600 font-medium">In Stock</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                    <span className="text-red-600 font-medium">Out of Stock</span>
-                  </>
-                )}
-              </div>
-
-              {/* Quantity Selector */}
-              <div className="flex items-center gap-4 mb-6">
-                <label htmlFor="quantity" className="text-sm font-medium">Quantity:</label>
-                <div className="flex items-center border rounded-lg">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedQuantity(Math.max(1, selectedQuantity - 1))}
-                    className="h-10 w-10"
-                  >
-                    -
-                  </Button>
-                  <span className="px-4 py-2 min-w-[3ch] text-center">{selectedQuantity}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedQuantity(selectedQuantity + 1)}
-                    className="h-10 w-10"
-                  >
-                    +
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="space-y-3">
-              <div className="flex gap-3">
-                <Button 
-                  className="flex-1 bg-primary hover:bg-primary/90"
-                  onClick={handleAddToCart}
-                  disabled={!product.inStock}
-                  size="lg"
-                >
-                  <ShoppingCart className="w-5 h-5 mr-2" />
-                  {product.inStock ? `Add ${selectedQuantity} to Cart` : "Out of Stock"}
-                </Button>
-                <Button variant="outline" size="lg" className="px-6">
-                  <Heart className="w-5 h-5" />
-                </Button>
-              </div>
-              
-              {/* Quick Actions */}
-              <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                <div className="flex flex-col items-center gap-1 p-3 rounded-lg bg-muted/50">
-                  <Truck className="w-5 h-5 text-primary" />
-                  <span className="font-medium">Fast Delivery</span>
-                  <span className="text-xs text-muted-foreground">2-3 days</span>
-                </div>
-                <div className="flex flex-col items-center gap-1 p-3 rounded-lg bg-muted/50">
-                  <Shield className="w-5 h-5 text-primary" />
-                  <span className="font-medium">Warranty</span>
-                  <span className="text-xs text-muted-foreground">2 years</span>
-                </div>
-                <div className="flex flex-col items-center gap-1 p-3 rounded-lg bg-muted/50">
-                  <RotateCcw className="w-5 h-5 text-primary" />
-                  <span className="font-medium">Returns</span>
-                  <span className="text-xs text-muted-foreground">30 days</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Product Description */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Description</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed">{product.description}</p>
-              </CardContent>
-            </Card>
-
-            {/* Key Features - Desktop */}
-            <Card className="hidden lg:block">
-              <CardHeader>
-                <CardTitle className="text-lg">Key Features</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  {features.map((feature, index) => (
-                    <li key={index} className="flex items-start gap-3">
-                      <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* Specifications */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Specifications</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {Object.entries(specifications).map(([key, value]) => (
-                    <div key={key} className="flex justify-between py-2 border-b border-border last:border-0">
-                      <span className="font-medium text-sm">{key}:</span>
-                      <span className="text-muted-foreground text-sm">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            )}
           </div>
         </div>
       </div>

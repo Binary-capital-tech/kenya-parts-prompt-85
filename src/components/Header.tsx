@@ -43,19 +43,6 @@ const Header = () => {
             <Button variant="ghost" size="icon" className="hidden sm:flex">
               <User className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="relative"
-              onClick={() => navigate('/cart')}
-            >
-              <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
-              {getTotalItems() > 0 && (
-                <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-medium">
-                  {getTotalItems() > 99 ? '99+' : getTotalItems()}
-                </span>
-              )}
-            </Button>
             <Button variant="ghost" size="icon" className="md:hidden">
               <Menu className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>

@@ -453,23 +453,23 @@ const ChatInterface = () => {
     });
   };
 
-  const simulateAIResponse = async (userMessage: string): Promise<{ content: string; products?: Product[] }> => {
+  const handleAIResponse = async (userMessage: string): Promise<{ content: string; products?: Product[] }> => {
     const message = userMessage.toLowerCase();
     
     try {
-      // Call Gemini AI backend with MCP
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gemini-chat`, {
+      // Call Gemini AI backend with MCP via WebSocket or direct call
+      const response = await fetch('https://tlgjxxsscuyrauopinoz.supabase.co/functions/v1/gemini-chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZ2p4eHNzY3V5cmF1b3Bpbm96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxMDk1NzQsImV4cCI6MjA3MzY4NTU3NH0.d3V1ZdSUronzivRV5MlJSU0dFkfHzFKhk-Qgtfikgd0'
         },
         body: JSON.stringify({
           message: userMessage,
           sessionId: currentSessionId,
-          userToken: `token_${Date.now()}`,
-          email: 'kalphaxide@gmail.com',
-          phone: '+254722000000'
+          userToken: localStorage.getItem('chatUserToken') || `token_${Date.now()}`,
+          email: localStorage.getItem('userEmail'),
+          phone: localStorage.getItem('userPhone')
         })
       });
 
@@ -689,9 +689,9 @@ const ChatInterface = () => {
       setShowQuickActions(false);
     }
 
-    // Simulate AI processing time
-    setTimeout(() => {
-      const aiResponse = simulateAIResponse(inputValue);
+    // Get AI response
+    try {
+      const aiResponse = await handleAIResponse(inputValue);
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
@@ -710,9 +710,28 @@ const ChatInterface = () => {
         }
         return session;
       }));
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: 'assistant',
+        content: "I'm sorry, I encountered an error. Please try again.",
+        timestamp: new Date()
+      };
       
-      setIsLoading(false);
-    }, 1000);
+      setChatSessions(prev => prev.map(session => {
+        if (session.id === currentSessionId) {
+          return {
+            ...session,
+            messages: [...session.messages, errorMessage],
+            lastActivity: new Date()
+          };
+        }
+        return session;
+      }));
+    }
+    
+    setIsLoading(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {

@@ -158,7 +158,7 @@ const DatabaseProductGrid = () => {
                 )}
                 {product.sale_price && (
                   <Badge 
-                    className="absolute top-3 right-3 bg-green-500 text-white"
+                    className="absolute top-3 right-3 bg-primary text-primary-foreground"
                     variant="secondary"
                   >
                     Sale
