@@ -25,134 +25,55 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 );
 
-// Enhanced Model Context Protocol - Define available tools for complex queries
+// Model Context Protocol - Define available tools
 const MCP_TOOLS = [
   {
     name: "get_products",
-    description: "Get comprehensive list of auto parts products with detailed filtering",
+    description: "Get list of available auto parts products",
     parameters: {
       type: "object",
       properties: {
-        category: { type: "string", description: "Product category filter (brake, engine, lighting, etc.)" },
-        brand: { type: "string", description: "Brand filter" },
+        category: { type: "string", description: "Product category filter" },
         search: { type: "string", description: "Search term" },
-        min_price: { type: "number", description: "Minimum price filter" },
-        max_price: { type: "number", description: "Maximum price filter" },
-        in_stock: { type: "boolean", description: "Filter by stock availability" },
-        limit: { type: "number", description: "Number of products to return (default: 10)" }
+        limit: { type: "number", description: "Number of products to return" }
       }
     }
   },
   {
     name: "search_products", 
-    description: "Advanced search for auto parts with intelligent matching",
+    description: "Search for specific auto parts",
     parameters: {
       type: "object",
       properties: {
-        query: { type: "string", description: "Natural language search query" },
-        vehicle_make: { type: "string", description: "Vehicle manufacturer (Toyota, Honda, etc.)" },
-        vehicle_model: { type: "string", description: "Vehicle model" },
-        vehicle_year: { type: "string", description: "Vehicle year" },
-        part_type: { type: "string", description: "Specific part type" },
-        price_range: { type: "string", description: "Price range preference (budget, mid-range, premium)" }
+        query: { type: "string", description: "Search query" }
       },
       required: ["query"]
     }
   },
   {
-    name: "get_vehicle_compatibility",
-    description: "Check part compatibility with specific vehicles",
-    parameters: {
-      type: "object",
-      properties: {
-        product_id: { type: "string", description: "Product ID to check compatibility" },
-        vehicle_make: { type: "string", description: "Vehicle make" },
-        vehicle_model: { type: "string", description: "Vehicle model" },
-        vehicle_year: { type: "string", description: "Vehicle year" }
-      },
-      required: ["vehicle_make", "vehicle_model", "vehicle_year"]
-    }
-  },
-  {
-    name: "get_product_recommendations",
-    description: "Get intelligent product recommendations based on user needs",
-    parameters: {
-      type: "object",
-      properties: {
-        base_product_id: { type: "string", description: "Base product to get recommendations for" },
-        vehicle_info: { type: "object", description: "Vehicle information" },
-        budget_range: { type: "string", description: "Budget preference" },
-        use_case: { type: "string", description: "Intended use (daily driving, performance, racing, etc.)" }
-      }
-    }
-  },
-  {
     name: "create_order",
-    description: "Create a comprehensive order with validation", 
+    description: "Create a new order for the customer", 
     parameters: {
       type: "object",
       properties: {
-        items: { type: "array", description: "Array of order items with product_id, quantity, price" },
-        customer_info: { 
-          type: "object", 
-          description: "Complete customer information",
-          properties: {
-            firstName: { type: "string" },
-            lastName: { type: "string" },
-            email: { type: "string" },
-            phone: { type: "string" },
-            address: { type: "string" },
-            city: { type: "string" },
-            postalCode: { type: "string" }
-          }
-        },
-        subtotal: { type: "number", description: "Subtotal amount" },
-        tax_amount: { type: "number", description: "Tax amount" },
-        shipping_amount: { type: "number", description: "Shipping cost" },
-        total_amount: { type: "number", description: "Total order amount" },
-        special_instructions: { type: "string", description: "Special delivery instructions" }
+        items: { type: "array", description: "Order items" },
+        customer_info: { type: "object", description: "Customer information" },
+        total_amount: { type: "number", description: "Total order amount" }
       },
       required: ["items", "customer_info", "total_amount"]
     }
   },
   {
     name: "initiate_mpesa_payment",
-    description: "Initiate M-Pesa STK push payment with validation",
+    description: "Initiate M-Pesa payment for an order",
     parameters: {
       type: "object", 
       properties: {
-        phone_number: { type: "string", description: "M-Pesa phone number (254xxxxxxxxx format)" },
-        amount: { type: "number", description: "Payment amount in KES" },
-        order_id: { type: "string", description: "Associated order ID" },
-        account_reference: { type: "string", description: "Account reference for the payment" },
-        transaction_desc: { type: "string", description: "Transaction description" }
+        phone_number: { type: "string", description: "M-Pesa phone number" },
+        amount: { type: "number", description: "Payment amount" },
+        order_id: { type: "string", description: "Order ID" }
       },
       required: ["phone_number", "amount"]
-    }
-  },
-  {
-    name: "check_inventory",
-    description: "Check real-time inventory status for products",
-    parameters: {
-      type: "object",
-      properties: {
-        product_ids: { type: "array", description: "Array of product IDs to check" },
-        quantity_required: { type: "number", description: "Required quantity" }
-      },
-      required: ["product_ids"]
-    }
-  },
-  {
-    name: "get_shipping_estimate",
-    description: "Calculate shipping costs and delivery time estimates",
-    parameters: {
-      type: "object",
-      properties: {
-        destination_city: { type: "string", description: "Delivery city" },
-        items: { type: "array", description: "Items for shipping calculation" },
-        shipping_method: { type: "string", description: "Preferred shipping method" }
-      },
-      required: ["destination_city", "items"]
     }
   }
 ];
@@ -243,46 +164,33 @@ async function executeMCPTool(toolName: string, args: any): Promise<any> {
   }
 }
 
-// Enhanced system prompt with advanced MCP integration
-const SYSTEM_PROMPT = `You are an advanced AI assistant for AutoSpares Kenya, a premium automotive parts specialist. You have sophisticated tools to help customers find the perfect auto parts for their vehicles.
+// Enhanced system prompt with MCP integration
+const SYSTEM_PROMPT = `You are an intelligent AI assistant for AutoSpares Kenya, a premium auto parts store. You help customers find the right auto parts for their vehicles using advanced tools and database integration.
 
-ENHANCED CAPABILITIES:
-- Intelligent product search with vehicle compatibility checking
-- Real-time inventory management and availability
-- Advanced product recommendations based on vehicle specifications
-- Complete order processing with M-Pesa integration
-- Shipping cost calculation and delivery estimates
-- Technical specifications and installation guidance
+CORE CAPABILITIES:
+- Search and recommend auto parts using real product database
+- Process orders and handle M-Pesa payments
+- Provide technical specifications and compatibility information
+- Guide customers through installation and maintenance
 
-AVAILABLE ADVANCED TOOLS:
-1. get_products - Comprehensive product listings with advanced filtering
-2. search_products - Natural language search with vehicle-specific matching
-3. get_vehicle_compatibility - Check part compatibility with specific vehicles
-4. get_product_recommendations - AI-powered product suggestions
-5. create_order - Complete order creation with validation
-6. initiate_mpesa_payment - Secure M-Pesa payment processing
-7. check_inventory - Real-time stock availability
-8. get_shipping_estimate - Delivery cost and time calculations
+AVAILABLE TOOLS (Model Context Protocol):
+1. get_products - Get list of available products
+2. search_products - Search for specific auto parts  
+3. create_order - Create customer orders
+4. initiate_mpesa_payment - Process M-Pesa payments
 
-ADVANCED RESPONSE GUIDELINES:
-- Always use vehicle compatibility checking for part recommendations
-- Provide multiple options at different price points when possible
-- Include installation difficulty and requirements in recommendations
-- Suggest complementary parts when relevant (brake pads + discs, etc.)
-- Offer performance upgrades when appropriate
-- Calculate total costs including shipping
-- Only process M-Pesa payments (no other payment methods)
-- Provide detailed technical specifications
-- Consider seasonal factors (rainy season tires, etc.)
+RESPONSE GUIDELINES:
+- Always search the database when customers ask about specific parts
+- Provide detailed product information including compatibility
+- Format product suggestions clearly with prices in KSh
+- Guide customers through the purchase process
+- Only suggest M-Pesa payment (no other payment methods)
+- Be helpful, professional, and knowledgeable about automotive parts
 
-INTELLIGENT QUERY HANDLING:
-- Parse complex multi-part queries (e.g., "I need brake pads and oil for my 2018 Toyota Corolla, budget under 10k")
-- Understand vehicle-specific terminology and abbreviations
-- Recognize performance vs. standard part requirements
-- Handle warranty and return policy questions
-- Provide maintenance schedules and replacement intervals
+When customers ask about products, use the search_products tool to find relevant items from the database.
+When customers want to make a purchase, guide them through creating an order and M-Pesa payment.
 
-Remember: Use the advanced tools to provide comprehensive, accurate, and personalized automotive solutions.`;
+Remember: You have access to real product data - always use it to provide accurate, up-to-date information.`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
