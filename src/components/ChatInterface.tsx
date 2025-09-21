@@ -15,6 +15,15 @@ import headlightImage from "@/assets/headlight.jpg";
 import airFilterImage from "@/assets/air-filter.jpg";
 import oilsImage from "@/assets/oils.jpg";
 
+const getProductImage = (category: string) => {
+  const categoryLower = category?.toLowerCase() || '';
+  if (categoryLower.includes('brake')) return brakePartsImage;
+  if (categoryLower.includes('light') || categoryLower.includes('lamp')) return headlightImage;
+  if (categoryLower.includes('filter') || categoryLower.includes('air')) return airFilterImage;
+  if (categoryLower.includes('oil') || categoryLower.includes('fluid')) return oilsImage;
+  return brakePartsImage; // Default fallback
+};
+
 interface Message {
   id: string;
   type: 'user' | 'assistant';
@@ -32,152 +41,6 @@ interface ChatSession {
   lastActivity: Date;
 }
 
-const sampleProducts = {
-  brake: [
-    {
-      id: "1",
-      name: "Premium Brake Disc & Pads Set",
-      brand: "Brembo",
-      price: 8500,
-      originalPrice: 12000,
-      image: brakePartsImage,
-      rating: 4.8,
-      description: "High-performance brake discs and pads for excellent stopping power",
-      category: "Brake System",
-      inStock: true
-    },
-    {
-      id: "11",
-      name: "Ceramic Brake Pads",
-      brand: "Akebono",
-      price: 4200,
-      image: brakePartsImage,
-      rating: 4.6,
-      description: "Low-dust ceramic brake pads for quiet operation",
-      category: "Brake System",
-      inStock: true
-    },
-    {
-      id: "12",
-      name: "Sports Brake Discs",
-      brand: "EBC",
-      price: 6800,
-      originalPrice: 8500,
-      image: brakePartsImage,
-      rating: 4.9,
-      description: "Slotted and drilled brake discs for enhanced cooling",
-      category: "Brake System",
-      inStock: false
-    }
-  ],
-  filter: [
-    {
-      id: "2",
-      name: "High Performance Air Filter",
-      brand: "K&N",
-      price: 2800,
-      originalPrice: 3500,
-      image: airFilterImage,
-      rating: 4.7,
-      description: "Reusable high-flow air filter for improved performance",
-      category: "Engine",
-      inStock: true
-    },
-    {
-      id: "21",
-      name: "OEM Air Filter",
-      brand: "Mann Filter",
-      price: 1500,
-      image: airFilterImage,
-      rating: 4.5,
-      description: "Original equipment quality air filter",
-      category: "Engine",
-      inStock: true
-    },
-    {
-      id: "22",
-      name: "Carbon Cabin Filter",
-      brand: "Bosch",
-      price: 3200,
-      image: airFilterImage,
-      rating: 4.8,
-      description: "Activated carbon cabin air filter for clean air",
-      category: "Interior",
-      inStock: true
-    }
-  ],
-  headlight: [
-    {
-      id: "3",
-      name: "LED Headlight Assembly",
-      brand: "Philips",
-      price: 15500,
-      image: headlightImage,
-      rating: 4.9,
-      description: "Premium LED headlight with excellent brightness and longevity",
-      category: "Lighting",
-      inStock: true
-    },
-    {
-      id: "31",
-      name: "Halogen Headlight Bulbs",
-      brand: "Osram",
-      price: 2400,
-      image: headlightImage,
-      rating: 4.4,
-      description: "High-quality halogen bulbs for standard headlights",
-      category: "Lighting",
-      inStock: true
-    },
-    {
-      id: "32",
-      name: "HID Xenon Kit",
-      brand: "Hella",
-      price: 8900,
-      originalPrice: 11500,
-      image: headlightImage,
-      rating: 4.7,
-      description: "Complete HID conversion kit for brighter lighting",
-      category: "Lighting",
-      inStock: true
-    }
-  ],
-  oil: [
-    {
-      id: "4",
-      name: "Full Synthetic Engine Oil",
-      brand: "Mobil 1",
-      price: 6200,
-      image: oilsImage,
-      rating: 4.8,
-      description: "Premium full synthetic motor oil for maximum protection",
-      category: "Fluids",
-      inStock: true
-    },
-    {
-      id: "41",
-      name: "Conventional Motor Oil",
-      brand: "Castrol",
-      price: 3800,
-      image: oilsImage,
-      rating: 4.5,
-      description: "High-quality conventional motor oil for everyday driving",
-      category: "Fluids",
-      inStock: true
-    },
-    {
-      id: "42",
-      name: "Transmission Fluid",
-      brand: "Valvoline",
-      price: 4500,
-      image: oilsImage,
-      rating: 4.6,
-      description: "Premium automatic transmission fluid for smooth shifting",
-      category: "Fluids",
-      inStock: true
-    }
-  ]
-};
 
 const ChatInterface = () => {
   const { toast } = useToast();
@@ -213,150 +76,8 @@ const ChatInterface = () => {
         {
           id: '1',
           type: 'assistant',
-          content: "Browse our top auto parts categories:",
-          products: [
-            sampleProducts.brake[0],
-            sampleProducts.headlight[0], 
-            sampleProducts.oil[0],
-            sampleProducts.filter[0]
-          ],
+          content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
           timestamp: new Date()
-        }
-      ]
-    },
-    {
-      id: '2',
-      title: 'Toyota Corolla Brake Pads',
-      createdAt: new Date(Date.now() - 86400000), // 1 day ago
-      lastActivity: new Date(Date.now() - 86400000),
-      messages: [
-        {
-          id: '2-1',
-          type: 'assistant',
-          content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
-          timestamp: new Date(Date.now() - 86400000)
-        },
-        {
-          id: '2-2',
-          type: 'user',
-          content: 'I need brake pads for my Toyota Corolla 2018',
-          timestamp: new Date(Date.now() - 86400000 + 30000)
-        },
-        {
-          id: '2-3',
-          type: 'assistant',
-          content: 'I found excellent brake pad options for your 2018 Toyota Corolla. Here are the top recommendations:',
-          timestamp: new Date(Date.now() - 86400000 + 60000),
-          products: [sampleProducts.brake[0], sampleProducts.brake[1]]
-        }
-      ]
-    },
-    {
-      id: '3',
-      title: 'Honda Civic Headlights',
-      createdAt: new Date(Date.now() - 172800000), // 2 days ago
-      lastActivity: new Date(Date.now() - 172800000),
-      messages: [
-        {
-          id: '3-1',
-          type: 'assistant',
-          content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
-          timestamp: new Date(Date.now() - 172800000)
-        },
-        {
-          id: '3-2',
-          type: 'user',
-          content: 'Show me headlights for Honda Civic 2020',
-          timestamp: new Date(Date.now() - 172800000 + 45000)
-        },
-        {
-          id: '3-3',
-          type: 'assistant',
-          content: 'Perfect! Here are premium headlight options for your 2020 Honda Civic:',
-          timestamp: new Date(Date.now() - 172800000 + 90000),
-          products: [sampleProducts.headlight[0], sampleProducts.headlight[1]]
-        }
-      ]
-    },
-    {
-      id: '4',
-      title: 'BMW Engine Oil Change',
-      createdAt: new Date(Date.now() - 259200000), // 3 days ago
-      lastActivity: new Date(Date.now() - 259200000),
-      messages: [
-        {
-          id: '4-1',
-          type: 'assistant',
-          content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
-          timestamp: new Date(Date.now() - 259200000)
-        },
-        {
-          id: '4-2',
-          type: 'user',
-          content: 'I need engine oil for BMW X3 2019, full synthetic',
-          timestamp: new Date(Date.now() - 259200000 + 60000)
-        },
-        {
-          id: '4-3',
-          type: 'assistant',
-          content: 'Excellent choice! Here are premium full synthetic oils perfect for your 2019 BMW X3:',
-          timestamp: new Date(Date.now() - 259200000 + 120000),
-          products: [sampleProducts.oil[0], sampleProducts.oil[1]]
-        },
-        {
-          id: '4-4',
-          type: 'user',
-          content: 'Generate invoice for the Mobil 1 oil',
-          timestamp: new Date(Date.now() - 259200000 + 180000)
-        },
-        {
-          id: '4-5',
-          type: 'assistant',
-          content: 'Perfect! I\'ve generated your invoice. Click the button below to view and download it.',
-          timestamp: new Date(Date.now() - 259200000 + 240000),
-          invoiceData: {
-            id: 'INV-2024-001',
-            date: new Date(Date.now() - 259200000 + 240000),
-            status: 'paid',
-            total: 89.99,
-            product: sampleProducts.oil[0],
-            customer: {
-              firstName: 'John',
-              lastName: 'Smith',
-              email: 'john.smith@email.com',
-              phone: '+254 722 123 456',
-              address: '123 Westlands Avenue',
-              city: 'Nairobi',
-              postalCode: '00100'
-            }
-          }
-        }
-      ]
-    },
-    {
-      id: '5',
-      title: 'Air Filter Replacement',
-      createdAt: new Date(Date.now() - 432000000), // 5 days ago
-      lastActivity: new Date(Date.now() - 432000000),
-      messages: [
-        {
-          id: '5-1',
-          type: 'assistant',
-          content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
-          timestamp: new Date(Date.now() - 432000000)
-        },
-        {
-          id: '5-2',
-          type: 'user',
-          content: 'My car needs an air filter replacement, it\'s a Nissan Altima 2017',
-          timestamp: new Date(Date.now() - 432000000 + 90000)
-        },
-        {
-          id: '5-3',
-          type: 'assistant',
-          content: 'Great! Here are high-quality air filters that will fit your 2017 Nissan Altima perfectly:',
-          timestamp: new Date(Date.now() - 432000000 + 150000),
-          products: [sampleProducts.filter[0], sampleProducts.filter[1]]
         }
       ]
     }
@@ -486,17 +207,17 @@ const ChatInterface = () => {
         );
         
         if (productResults && Array.isArray(productResults.result)) {
-          const products = productResults.result.map((product: any) => ({
-            id: product.id.toString(),
-            name: product.name,
-            brand: product.brand,
-            price: product.price,
-            image: brakePartsImage, // Default image for now
-            rating: product.rating,
-            description: product.description,
-            category: product.category,
-            inStock: product.inStock
-          }));
+            const products = productResults.result.map((product: any) => ({
+              id: product.id.toString(),
+              name: product.name,
+              brand: product.brand,
+              price: product.price,
+              image: getProductImage(product.category),
+              rating: product.rating,
+              description: product.description,
+              category: product.category,
+              inStock: product.inStock
+            }));
           
           return {
             content: data.response,
