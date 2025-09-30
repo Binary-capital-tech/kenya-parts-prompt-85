@@ -10,10 +10,6 @@ import { Send, Bot, User, ShoppingCart, Star, Minus, Plus, X, ArrowLeft, History
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useCart, Product } from "@/components/CartContext";
-import brakePartsImage from "@/assets/brake-parts.jpg";
-import headlightImage from "@/assets/headlight.jpg";
-import airFilterImage from "@/assets/air-filter.jpg";
-import oilsImage from "@/assets/oils.jpg";
 
 interface Message {
   id: string;
@@ -31,153 +27,6 @@ interface ChatSession {
   createdAt: Date;
   lastActivity: Date;
 }
-
-const sampleProducts = {
-  brake: [
-    {
-      id: "1",
-      name: "Premium Brake Disc & Pads Set",
-      brand: "Brembo",
-      price: 8500,
-      originalPrice: 12000,
-      image: brakePartsImage,
-      rating: 4.8,
-      description: "High-performance brake discs and pads for excellent stopping power",
-      category: "Brake System",
-      inStock: true
-    },
-    {
-      id: "11",
-      name: "Ceramic Brake Pads",
-      brand: "Akebono",
-      price: 4200,
-      image: brakePartsImage,
-      rating: 4.6,
-      description: "Low-dust ceramic brake pads for quiet operation",
-      category: "Brake System",
-      inStock: true
-    },
-    {
-      id: "12",
-      name: "Sports Brake Discs",
-      brand: "EBC",
-      price: 6800,
-      originalPrice: 8500,
-      image: brakePartsImage,
-      rating: 4.9,
-      description: "Slotted and drilled brake discs for enhanced cooling",
-      category: "Brake System",
-      inStock: false
-    }
-  ],
-  filter: [
-    {
-      id: "2",
-      name: "High Performance Air Filter",
-      brand: "K&N",
-      price: 2800,
-      originalPrice: 3500,
-      image: airFilterImage,
-      rating: 4.7,
-      description: "Reusable high-flow air filter for improved performance",
-      category: "Engine",
-      inStock: true
-    },
-    {
-      id: "21",
-      name: "OEM Air Filter",
-      brand: "Mann Filter",
-      price: 1500,
-      image: airFilterImage,
-      rating: 4.5,
-      description: "Original equipment quality air filter",
-      category: "Engine",
-      inStock: true
-    },
-    {
-      id: "22",
-      name: "Carbon Cabin Filter",
-      brand: "Bosch",
-      price: 3200,
-      image: airFilterImage,
-      rating: 4.8,
-      description: "Activated carbon cabin air filter for clean air",
-      category: "Interior",
-      inStock: true
-    }
-  ],
-  headlight: [
-    {
-      id: "3",
-      name: "LED Headlight Assembly",
-      brand: "Philips",
-      price: 15500,
-      image: headlightImage,
-      rating: 4.9,
-      description: "Premium LED headlight with excellent brightness and longevity",
-      category: "Lighting",
-      inStock: true
-    },
-    {
-      id: "31",
-      name: "Halogen Headlight Bulbs",
-      brand: "Osram",
-      price: 2400,
-      image: headlightImage,
-      rating: 4.4,
-      description: "High-quality halogen bulbs for standard headlights",
-      category: "Lighting",
-      inStock: true
-    },
-    {
-      id: "32",
-      name: "HID Xenon Kit",
-      brand: "Hella",
-      price: 8900,
-      originalPrice: 11500,
-      image: headlightImage,
-      rating: 4.7,
-      description: "Complete HID conversion kit for brighter lighting",
-      category: "Lighting",
-      inStock: true
-    }
-  ],
-  oil: [
-    {
-      id: "4",
-      name: "Full Synthetic Engine Oil",
-      brand: "Mobil 1",
-      price: 6200,
-      image: oilsImage,
-      rating: 4.8,
-      description: "Premium full synthetic motor oil for maximum protection",
-      category: "Fluids",
-      inStock: true
-    },
-    {
-      id: "41",
-      name: "Conventional Motor Oil",
-      brand: "Castrol",
-      price: 3800,
-      image: oilsImage,
-      rating: 4.5,
-      description: "High-quality conventional motor oil for everyday driving",
-      category: "Fluids",
-      inStock: true
-    },
-    {
-      id: "42",
-      name: "Transmission Fluid",
-      brand: "Valvoline",
-      price: 4500,
-      image: oilsImage,
-      rating: 4.6,
-      description: "Premium automatic transmission fluid for smooth shifting",
-      category: "Fluids",
-      inStock: true
-    }
-  ]
-};
 
 const ChatInterface = () => {
   const { toast } = useToast();
@@ -203,164 +52,24 @@ const ChatInterface = () => {
         }))
       }));
     }
+    // Initial session with welcome message only
     return [
-    {
-      id: '1',
-      title: 'Welcome Chat',
-      createdAt: new Date(),
-      lastActivity: new Date(),
-      messages: [
-        {
-          id: '1',
-          type: 'assistant',
-          content: "Browse our top auto parts categories:",
-          products: [
-            sampleProducts.brake[0],
-            sampleProducts.headlight[0], 
-            sampleProducts.oil[0],
-            sampleProducts.filter[0]
-          ],
-          timestamp: new Date()
-        }
-      ]
-    },
-    {
-      id: '2',
-      title: 'Toyota Corolla Brake Pads',
-      createdAt: new Date(Date.now() - 86400000), // 1 day ago
-      lastActivity: new Date(Date.now() - 86400000),
-      messages: [
-        {
-          id: '2-1',
-          type: 'assistant',
-          content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
-          timestamp: new Date(Date.now() - 86400000)
-        },
-        {
-          id: '2-2',
-          type: 'user',
-          content: 'I need brake pads for my Toyota Corolla 2018',
-          timestamp: new Date(Date.now() - 86400000 + 30000)
-        },
-        {
-          id: '2-3',
-          type: 'assistant',
-          content: 'I found excellent brake pad options for your 2018 Toyota Corolla. Here are the top recommendations:',
-          timestamp: new Date(Date.now() - 86400000 + 60000),
-          products: [sampleProducts.brake[0], sampleProducts.brake[1]]
-        }
-      ]
-    },
-    {
-      id: '3',
-      title: 'Honda Civic Headlights',
-      createdAt: new Date(Date.now() - 172800000), // 2 days ago
-      lastActivity: new Date(Date.now() - 172800000),
-      messages: [
-        {
-          id: '3-1',
-          type: 'assistant',
-          content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
-          timestamp: new Date(Date.now() - 172800000)
-        },
-        {
-          id: '3-2',
-          type: 'user',
-          content: 'Show me headlights for Honda Civic 2020',
-          timestamp: new Date(Date.now() - 172800000 + 45000)
-        },
-        {
-          id: '3-3',
-          type: 'assistant',
-          content: 'Perfect! Here are premium headlight options for your 2020 Honda Civic:',
-          timestamp: new Date(Date.now() - 172800000 + 90000),
-          products: [sampleProducts.headlight[0], sampleProducts.headlight[1]]
-        }
-      ]
-    },
-    {
-      id: '4',
-      title: 'BMW Engine Oil Change',
-      createdAt: new Date(Date.now() - 259200000), // 3 days ago
-      lastActivity: new Date(Date.now() - 259200000),
-      messages: [
-        {
-          id: '4-1',
-          type: 'assistant',
-          content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
-          timestamp: new Date(Date.now() - 259200000)
-        },
-        {
-          id: '4-2',
-          type: 'user',
-          content: 'I need engine oil for BMW X3 2019, full synthetic',
-          timestamp: new Date(Date.now() - 259200000 + 60000)
-        },
-        {
-          id: '4-3',
-          type: 'assistant',
-          content: 'Excellent choice! Here are premium full synthetic oils perfect for your 2019 BMW X3:',
-          timestamp: new Date(Date.now() - 259200000 + 120000),
-          products: [sampleProducts.oil[0], sampleProducts.oil[1]]
-        },
-        {
-          id: '4-4',
-          type: 'user',
-          content: 'Generate invoice for the Mobil 1 oil',
-          timestamp: new Date(Date.now() - 259200000 + 180000)
-        },
-        {
-          id: '4-5',
-          type: 'assistant',
-          content: 'Perfect! I\'ve generated your invoice. Click the button below to view and download it.',
-          timestamp: new Date(Date.now() - 259200000 + 240000),
-          invoiceData: {
-            id: 'INV-2024-001',
-            date: new Date(Date.now() - 259200000 + 240000),
-            status: 'paid',
-            total: 89.99,
-            product: sampleProducts.oil[0],
-            customer: {
-              firstName: 'John',
-              lastName: 'Smith',
-              email: 'john.smith@email.com',
-              phone: '+254 722 123 456',
-              address: '123 Westlands Avenue',
-              city: 'Nairobi',
-              postalCode: '00100'
-            }
+      {
+        id: '1',
+        title: 'Welcome Chat',
+        createdAt: new Date(),
+        lastActivity: new Date(),
+        messages: [
+          {
+            id: '1',
+            type: 'assistant',
+            content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
+            timestamp: new Date()
           }
-        }
-      ]
-    },
-    {
-      id: '5',
-      title: 'Air Filter Replacement',
-      createdAt: new Date(Date.now() - 432000000), // 5 days ago
-      lastActivity: new Date(Date.now() - 432000000),
-      messages: [
-        {
-          id: '5-1',
-          type: 'assistant',
-          content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
-          timestamp: new Date(Date.now() - 432000000)
-        },
-        {
-          id: '5-2',
-          type: 'user',
-          content: 'My car needs an air filter replacement, it\'s a Nissan Altima 2017',
-          timestamp: new Date(Date.now() - 432000000 + 90000)
-        },
-        {
-          id: '5-3',
-          type: 'assistant',
-          content: 'Great! Here are high-quality air filters that will fit your 2017 Nissan Altima perfectly:',
-          timestamp: new Date(Date.now() - 432000000 + 150000),
-          products: [sampleProducts.filter[0], sampleProducts.filter[1]]
-        }
-      ]
-    }
-  ]});
+        ]
+      }
+    ];
+  });
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("chat");
@@ -377,6 +86,7 @@ const ChatInterface = () => {
   useEffect(() => {
     sessionStorage.setItem('chatSessions', JSON.stringify(chatSessions));
   }, [chatSessions]);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -458,7 +168,7 @@ const ChatInterface = () => {
     
     try {
       // Call Gemini AI backend with MCP via WebSocket or direct call
-      const response = await fetch('https://tlgjxxsscuyrauopinoz.supabase.co/functions/v1/gemini-chat', {
+      const response = await fetch('https://tlgjxxsscuyrauopinoz.supabase.co/functions/v1/dynamic-api', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -491,7 +201,7 @@ const ChatInterface = () => {
             name: product.name,
             brand: product.brand,
             price: product.price,
-            image: brakePartsImage, // Default image for now
+            image: product.image_url || '/src/assets/hero-parts.jpg', // Use actual image or fallback
             rating: product.rating,
             description: product.description,
             category: product.category,
@@ -512,8 +222,7 @@ const ChatInterface = () => {
     } catch (error) {
       console.error('AI Response error:', error);
       
-      // Fallback to local logic
-      // Handle navigation requests
+      // Fallback to basic logic for navigation and cart requests
       if (message.includes('go to cart') || message.includes('navigate to cart') || message.includes('take me to cart') || message.includes('open cart')) {
         navigate('/cart');
         return {
@@ -544,111 +253,9 @@ const ChatInterface = () => {
         }
       }
       
-      // Handle product search with fallback
-      if (message.includes('brake')) {
-        return {
-          content: "I found some excellent brake parts for you:",
-          products: sampleProducts.brake
-        };
-      }
-      
-      if (message.includes('filter') || message.includes('air')) {
-        return {
-          content: "Here are some great air filter options:",
-          products: sampleProducts.filter
-        };
-      }
-      
-      if (message.includes('headlight') || message.includes('light')) {
-        return {
-          content: "Check out these headlight options:",
-          products: sampleProducts.headlight
-        };
-      }
-      
-      if (message.includes('oil') || message.includes('engine')) {
-        return {
-          content: "Here are premium oil options for your vehicle:",
-          products: sampleProducts.oil
-        };
-      }
-      
       // Default response
       return {
         content: "I'm here to help you find auto parts! What specific parts are you looking for your vehicle? I can help you find brake pads, air filters, headlights, engine oil, and more."
-      };
-    }
-    
-    // Handle invoice request with example
-    if (message.includes('invoice')) {
-      const exampleOrder = {
-        id: "INV-2024-001",
-        date: new Date().toISOString(),
-        status: "paid",
-        customer: {
-          firstName: "John",
-          lastName: "Doe",
-          email: "john.doe@example.com",
-          phone: "+254 700 123 456",
-          address: "123 Kenyatta Avenue",
-          city: "Nairobi",
-          postalCode: "00100"
-        },
-        product: {
-          id: "1",
-          name: "Premium Brake Disc & Pads Set",
-          brand: "Brembo",
-          price: 8500,
-          image: brakePartsImage,
-          category: "Brake System"
-        },
-        total: 9000
-      };
-      
-      // Navigate to invoice page with example data
-      setTimeout(() => {
-        navigate('/invoice', { state: { order: exampleOrder } });
-      }, 1000);
-      
-      return {
-        content: "Here's an example invoice for your reference. I'm generating a sample invoice now to show you the format and details we provide for all orders."
-      };
-    }
-    
-    // Handle multiple keywords and broader search terms
-    if (message.includes('brake') || message.includes('pad') || message.includes('disc') || message.includes('stop')) {
-      return {
-        content: "I found several brake options from different brands! Here are some premium brake components that would be perfect for your vehicle:",
-        products: sampleProducts.brake
-      };
-    } else if (message.includes('filter') || message.includes('air') || message.includes('cabin') || message.includes('engine')) {
-      return {
-        content: "Great choice! Here are different types of air filters from various brands. Each offers different benefits for your engine:",
-        products: sampleProducts.filter
-      };
-    } else if (message.includes('headlight') || message.includes('light') || message.includes('led') || message.includes('bulb') || message.includes('lamp')) {
-      return {
-        content: "I have several lighting options from top brands. From LED to HID, here are some excellent headlight solutions:",
-        products: sampleProducts.headlight
-      };
-    } else if (message.includes('oil') || message.includes('fluid') || message.includes('synthetic') || message.includes('motor') || message.includes('transmission')) {
-      return {
-        content: "Here are different types of oils and fluids from trusted brands to keep your engine running smoothly:",
-        products: sampleProducts.oil
-      };
-    } else if (message.includes('spark') || message.includes('plug')) {
-      return {
-        content: "Here are some quality spark plugs and ignition components:",
-        products: sampleProducts.filter // Using filter as placeholder for spark plugs
-      };
-    } else if (message.includes('battery') || message.includes('power')) {
-      return {
-        content: "Here are reliable battery options for your vehicle:",
-        products: sampleProducts.brake // Using brake as placeholder for batteries
-      };
-    } else {
-      return {
-        content: "I can help you find auto parts! Please specify what you're looking for. For example:\n\n• Brake pads or discs\n• Air filters\n• Engine oil\n• Headlights\n• Spark plugs\n• Battery\n• Invoice (to see an example)\n\nJust tell me your vehicle make, model, and year if you know it, and what part you need!"
       };
     }
   };
