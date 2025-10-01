@@ -10,6 +10,7 @@ import { Send, Bot, User, ShoppingCart, Star, Minus, Plus, X, ArrowLeft, History
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useCart, Product } from "@/components/CartContext";
+
 interface Message {
   id: string;
   type: 'user' | 'assistant';
@@ -28,34 +29,44 @@ interface ChatSession {
   sessionToken?: string;
 }
 
-
-
 const ChatInterface = () => {
-
   const [bottomOffset, setBottomOffset] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
-useEffect(() => {
-  if (window.visualViewport) {
-    const onResize = () => {
-      const offset = window.innerHeight - window.visualViewport.height;
-      setBottomOffset(offset > 0 ? offset : 0);
-    };
-    window.visualViewport.addEventListener("resize", onResize);
-    return () => window.visualViewport.removeEventListener("resize", onResize);
-  }
-}, []);
+  useEffect(() => {
+    if (window.visualViewport) {
+      const onResize = () => {
+        const viewportHeight = window.visualViewport.height;
+        const windowHeight = window.innerHeight;
+        const offset = windowHeight - viewportHeight;
+        
+        // Keyboard is visible if offset is significant (more than 100px)
+        const keyboardVisible = offset > 100;
+        setIsKeyboardVisible(keyboardVisible);
+        setBottomOffset(keyboardVisible ? offset : 0);
+      };
+      
+      window.visualViewport.addEventListener("resize", onResize);
+      window.visualViewport.addEventListener("scroll", onResize);
+      
+      return () => {
+        window.visualViewport.removeEventListener("resize", onResize);
+        window.visualViewport.removeEventListener("scroll", onResize);
+      };
+    }
+  }, []);
 
   const { toast } = useToast();
   const navigate = useNavigate();
   const { cart, addToCart, removeFromCart, updateQuantity, getTotalPrice, getTotalItems } = useCart();
   
-  // Session Token Management
   const [sessionToken, setSessionToken] = useState<string>(() => {
     return localStorage.getItem('sessionToken') || '';
   });
   
   const [currentSessionId, setCurrentSessionId] = useState<string>(() => {
-    return sessionStorage.getItem('currentSessionId') || '1';
+    const saved = sessionStorage.getItem('currentSessionId');
+    return saved || 'initial_loading';
   });
   
   const [showQuickActions, setShowQuickActions] = useState(() => {
@@ -68,6 +79,7 @@ useEffect(() => {
       const parsed = JSON.parse(saved);
       return parsed.map((session: any) => ({
         ...session,
+        createdAt: new Date(session.createdAt),
         lastActivity: new Date(session.lastActivity),
         messages: session.messages.map((msg: any) => ({
           ...msg,
@@ -75,37 +87,19 @@ useEffect(() => {
         }))
       }));
     }
-    return [
-      {
-        id: 'temp_initial',
-        title: 'Welcome Chat',
-        createdAt: new Date(),
-        lastActivity: new Date(),
-        sessionToken: '',
-        messages: [
-          {
-            id: '1',
-            type: 'assistant',
-            content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
-            timestamp: new Date()
-          }
-        ]
-      }
-    ];
+    return [];
   });
   
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("chat");
 
-  // Save session token to localStorage
   useEffect(() => {
     if (sessionToken) {
       localStorage.setItem('sessionToken', sessionToken);
     }
   }, [sessionToken]);
 
-  // Save state to sessionStorage
   useEffect(() => {
     sessionStorage.setItem('currentSessionId', currentSessionId);
   }, [currentSessionId]);
@@ -131,45 +125,94 @@ useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  // Initialize session on component mount
   useEffect(() => {
     const initializeSession = async () => {
-      // Check if we have a valid initial session
       const initialSession = chatSessions.find(s => s.id === currentSessionId);
       
-      // If initial session is the temp one, fetch product recommendations
-      if (initialSession?.id === 'temp_initial' && initialSession.messages.length === 1) {
+      const needsInitialization = 
+        chatSessions.length === 0 ||
+        currentSessionId === 'initial_loading' ||
+        initialSession?.id === 'temp_initial' || 
+        !initialSession?.sessionToken ||
+        !sessionToken;
+      
+      if (needsInitialization) {
         try {
           setIsLoading(true);
           
-          // Fetch diverse product recommendations
-          const categories = ['Show me brake pads', 'Engine oil options', 'LED headlights'];
-          const randomCategory = categories[Math.floor(Math.random() * categories.length)];
-          
-          const aiResponse = await handleAIResponse(randomCategory);
-          
-          if (aiResponse.products && aiResponse.products.length > 0) {
-            const welcomeMessage: Message = {
-              id: (Date.now() + 1).toString(),
-              type: 'assistant',
-              content: `Here are some popular auto parts to get you started:`,
-              products: aiResponse.products.slice(0, 3), // Show 3 products
-              timestamp: new Date()
-            };
+          const response = await fetch('https://tlgjxxsscuyrauopinoz.supabase.co/functions/v1/dynamic-api', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZ2p4eHNzY3V5cmF1b3Bpbm96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxMDk1NzQsImV4cCI6MjA3MzY4NTU3NH0.d3V1ZdSUronzivRV5MlJSU0dFkfHzFKhk-Qgtfikgd0'
+            },
+            body: JSON.stringify({
+              message: 'GET_INITIAL_RECOMMENDATIONS',
+              sessionId: null,
+              sessionToken: null,
+              isInitialLoad: true
+            })
+          });
 
-            setChatSessions(prev => prev.map(session => {
-              if (session.id === 'temp_initial') {
-                return {
-                  ...session,
-                  messages: [...session.messages, welcomeMessage],
-                  lastActivity: new Date()
-                };
-              }
-              return session;
-            }));
+          if (response.ok) {
+            const data = await response.json();
+            
+            if (data.sessionId && data.sessionToken) {
+              setCurrentSessionId(data.sessionId);
+              setSessionToken(data.sessionToken);
+              
+              const welcomeMessage: Message = {
+                id: Date.now().toString(),
+                type: 'assistant',
+                content: data.response || 'Welcome to AutoSpares Kenya! Here are some popular auto parts to get you started:',
+                products: data.toolResults?.[0]?.result || [],
+                timestamp: new Date()
+              };
+
+              setChatSessions([{
+                id: data.sessionId,
+                title: 'Welcome Chat',
+                createdAt: new Date(),
+                lastActivity: new Date(),
+                sessionToken: data.sessionToken,
+                messages: [welcomeMessage]
+              }]);
+              
+              toast({
+                title: "Session started",
+                description: "AI assistant ready with product recommendations!",
+              });
+            }
+          } else {
+            throw new Error('Failed to initialize session');
           }
         } catch (error) {
-          console.error('Error fetching initial products:', error);
+          console.error('Error initializing session:', error);
+          
+          const fallbackSession: ChatSession = {
+            id: `temp_${Date.now()}`,
+            title: 'Welcome Chat',
+            createdAt: new Date(),
+            lastActivity: new Date(),
+            sessionToken: '',
+            messages: [
+              {
+                id: Date.now().toString(),
+                type: 'assistant',
+                content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
+                timestamp: new Date()
+              }
+            ]
+          };
+          
+          setChatSessions([fallbackSession]);
+          setCurrentSessionId(fallbackSession.id);
+          
+          toast({
+            title: "Connection issue",
+            description: "Please try sending a message to reconnect.",
+            variant: "destructive"
+          });
         } finally {
           setIsLoading(false);
         }
@@ -177,40 +220,92 @@ useEffect(() => {
     };
 
     initializeSession();
-  }, []); // Run once on mount
+  }, []);
 
   const generateSessionTitle = (firstUserMessage: string): string => {
     const words = firstUserMessage.split(' ').slice(0, 6).join(' ');
     return words.length > 30 ? words.substring(0, 30) + '...' : words;
   };
 
-  const startNewSession = () => {
-    // Clear session token to start fresh
-    const newToken = ''; // Backend will generate new token
-    setSessionToken(newToken);
-    localStorage.removeItem('sessionToken'); // Clear from localStorage too
-    
+  const startNewSession = async () => {
     const tempSessionId = `temp_${Date.now()}`;
-    const newSession: ChatSession = {
-      id: tempSessionId,
-      title: 'New Chat',
-      createdAt: new Date(),
-      lastActivity: new Date(),
-      sessionToken: newToken,
-      messages: [
-        {
-          id: Date.now().toString(),
-          type: 'assistant',
-          content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
-          timestamp: new Date()
-        }
-      ]
-    };
     
-    setChatSessions(prev => [newSession, ...prev]);
     setCurrentSessionId(tempSessionId);
+    setSessionToken('');
     setActiveTab("chat");
     setShowQuickActions(true);
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch('https://tlgjxxsscuyrauopinoz.supabase.co/functions/v1/dynamic-api', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZ2p4eHNzY3V5cmF1b3Bpbm96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxMDk1NzQsImV4cCI6MjA3MzY4NTU3NH0.d3V1ZdSUronzivRV5MlJSU0dFkfHzFKhk-Qgtfikgd0'
+        },
+        body: JSON.stringify({
+          message: 'GET_INITIAL_RECOMMENDATIONS',
+          sessionId: null,
+          sessionToken: null,
+          isInitialLoad: true
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.sessionId && data.sessionToken) {
+          setSessionToken(data.sessionToken);
+          setCurrentSessionId(data.sessionId);
+          
+          const newSession: ChatSession = {
+            id: data.sessionId,
+            title: 'New Chat',
+            createdAt: new Date(),
+            lastActivity: new Date(),
+            sessionToken: data.sessionToken,
+            messages: [
+              {
+                id: Date.now().toString(),
+                type: 'assistant',
+                content: data.response || 'Welcome to AutoSpares Kenya! Here are some popular auto parts:',
+                products: data.toolResults?.[0]?.result || [],
+                timestamp: new Date()
+              }
+            ]
+          };
+          
+          setChatSessions(prev => [newSession, ...prev]);
+          
+          toast({
+            title: "New chat started",
+            description: "Fresh session with product recommendations!",
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error creating new session:', error);
+      
+      const newSession: ChatSession = {
+        id: tempSessionId,
+        title: 'New Chat',
+        createdAt: new Date(),
+        lastActivity: new Date(),
+        sessionToken: '',
+        messages: [
+          {
+            id: Date.now().toString(),
+            type: 'assistant',
+            content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
+            timestamp: new Date()
+          }
+        ]
+      };
+      
+      setChatSessions(prev => [newSession, ...prev]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const deleteSession = (sessionId: string) => {
@@ -241,7 +336,6 @@ useEffect(() => {
     if (session?.sessionToken) {
       setSessionToken(session.sessionToken);
     } else {
-      // Clear token if switching to session without one
       setSessionToken('');
     }
     setCurrentSessionId(sessionId);
@@ -260,11 +354,9 @@ useEffect(() => {
     const message = userMessage.toLowerCase();
     
     try {
-      // Get user info from localStorage
       const email = localStorage.getItem('userEmail');
       const phone = localStorage.getItem('userPhone');
       
-      // Call Gemini AI backend with session token
       const response = await fetch('https://tlgjxxsscuyrauopinoz.supabase.co/functions/v1/dynamic-api', {
         method: 'POST',
         headers: {
@@ -286,12 +378,10 @@ useEffect(() => {
 
       const data = await response.json();
       
-      // Update session with actual UUID from backend
       if (data.sessionId && data.sessionId !== currentSessionId) {
         const oldSessionId = currentSessionId;
         setCurrentSessionId(data.sessionId);
         
-        // Update session ID in chat sessions
         setChatSessions(prev => prev.map(session => {
           if (session.id === oldSessionId) {
             return {
@@ -303,12 +393,9 @@ useEffect(() => {
         }));
       }
       
-      // Update session token if backend generated a new one
       if (data.sessionToken && data.sessionToken !== sessionToken) {
-        console.log('Received new session token from backend:', data.sessionToken);
         setSessionToken(data.sessionToken);
         
-        // Update the session with the new token
         setChatSessions(prev => prev.map(session => {
           if (session.id === currentSessionId || session.id === data.sessionId) {
             return {
@@ -320,7 +407,6 @@ useEffect(() => {
         }));
       }
       
-      // If we have tool results with products, format them
       if (data.toolResults && data.toolResults.length > 0) {
         const productResults = data.toolResults.find((result: any) => 
           result.tool === 'search_products' || result.tool === 'get_products'
@@ -353,7 +439,6 @@ useEffect(() => {
     } catch (error) {
       console.error('AI Response error:', error);
       
-      // Fallback to basic logic for navigation and cart requests
       if (message.includes('go to cart') || message.includes('navigate to cart') || message.includes('take me to cart') || message.includes('open cart')) {
         navigate('/cart');
         return {
@@ -368,7 +453,6 @@ useEffect(() => {
         };
       }
       
-      // Handle cart request
       if (message.includes('cart') || message.includes('shopping cart') || message.includes('my cart')) {
         if (cart.length === 0) {
           return {
@@ -384,7 +468,6 @@ useEffect(() => {
         }
       }
       
-      // Default response
       return {
         content: "I'm here to help you find auto parts! What specific parts are you looking for your vehicle? I can help you find brake pads, air filters, headlights, engine oil, and more."
       };
@@ -401,7 +484,6 @@ useEffect(() => {
       timestamp: new Date()
     };
 
-    // Update current session with new message
     setChatSessions(prev => prev.map(session => {
       if (session.id === currentSessionId) {
         const updatedMessages = [...session.messages, userMessage];
@@ -422,12 +504,10 @@ useEffect(() => {
     setInputValue("");
     setIsLoading(true);
     
-    // Hide quick actions after first user message
     if (showQuickActions) {
       setShowQuickActions(false);
     }
 
-    // Get AI response
     try {
       const aiResponse = await handleAIResponse(inputValue);
       const assistantMessage: Message = {
@@ -483,7 +563,6 @@ useEffect(() => {
     setInputValue("");
     setShowQuickActions(false);
     
-    // Directly send the suggestion without setting inputValue
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
@@ -557,8 +636,8 @@ useEffect(() => {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
-      <div className="border-b bg-card/95 backdrop-blur-sm px-3 sm:px-6 py-3 sm:py-4 sm:sticky sm:top-0 sm:z-10 relative">
-<div className="flex items-center justify-between">
+      <div className="sticky top-0 z-20 border-b bg-card/95 backdrop-blur-sm px-3 sm:px-6 py-3 sm:py-4 shadow-sm">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-hero rounded-lg flex items-center justify-center">
               <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
@@ -570,7 +649,6 @@ useEffect(() => {
           </div>
           
           <div className="flex items-center gap-2">
-            {/* Session Token Indicator */}
             {sessionToken && (
               <Badge variant="secondary" className="text-xs hidden md:flex">
                 Session Active
@@ -596,7 +674,6 @@ useEffect(() => {
               <span className="hidden xs:inline">History</span>
             </Button>
             
-            {/* Cart */}
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="outline" size="sm" className="relative text-xs sm:text-sm">
@@ -678,7 +755,7 @@ useEffect(() => {
                         <span>KSh {getTotalPrice().toLocaleString()}</span>
                       </div>
                       <Button 
-                        className="w-full bg-primary hover:bg-primary/90"
+                        className="w-full bg-gradient-to-r from-premium-green to-emerald-600 hover:from-premium-green/90 hover:to-emerald-600/90 text-white shadow-lg hover:shadow-xl transition-all"
                         onClick={() => navigate('/checkout', { state: { cart, totalPrice: getTotalPrice() } })}
                       >
                         Proceed to Checkout
@@ -943,7 +1020,7 @@ useEffect(() => {
       </div>
 
       {/* Enhanced Input Area - Fixed/Sticky */}
-      <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-card/95 backdrop-blur-md px-3 sm:px-4 py-3 sm:py-4 shadow-floating">
+      <div className="sticky bottom-0 left-0 right-0 border-t border-border bg-card/95 backdrop-blur-md px-3 sm:px-4 py-3 shadow-floating z-50 mb-16" style={{ marginBottom: bottomOffset }}>
   <div className="max-w-4xl mx-auto">
    
    {/* Chat Input Bar */}
@@ -963,7 +1040,7 @@ useEffect(() => {
             Math.min(e.target.scrollHeight, 128) + "px"; // grow up to 128px
         }}
         onKeyDown={handleKeyPress}
-        placeholder="Ask for auto parts... Try 'brake pads', 'headlights', or 'engine oil'"
+        placeholder="Ask for auto parts... "
         className="w-full resize-none pr-16 bg-background border-border focus:border-primary transition-colors text-sm leading-relaxed min-h-[44px] max-h-32 overflow-y-auto"
         disabled={isLoading || activeTab !== "chat"}
         rows={1}
