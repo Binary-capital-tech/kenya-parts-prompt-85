@@ -755,7 +755,7 @@ const ChatInterface = () => {
                         <span>KSh {getTotalPrice().toLocaleString()}</span>
                       </div>
                       <Button 
-                        className="w-full bg-gradient-to-r from-premium-green to-emerald-600 hover:from-premium-green/90 hover:to-emerald-600/90 text-white shadow-lg hover:shadow-xl transition-all"
+                        className="flex-1 max-w-xs btn-premium disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={() => navigate('/checkout', { state: { cart, totalPrice: getTotalPrice() } })}
                       >
                         Proceed to Checkout

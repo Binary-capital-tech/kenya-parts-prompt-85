@@ -15,14 +15,14 @@ const CartBottomActions = () => {
         <div className="flex gap-3 justify-center">
           <Button
             onClick={() => navigate('/cart')}
-            className="flex-1 max-w-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+            className="flex-1 max-w-xs btn-premium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ShoppingCart className="w-4 h-4 mr-2" />
             View Cart ({getTotalItems()})
           </Button>
           <Button
             onClick={() => navigate('/checkout')}
-            className="flex-1 max-w-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+            className="flex-1 max-w-xs btn-premium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Checkout
           </Button>
