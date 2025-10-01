@@ -28,7 +28,7 @@ const App = () => (
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/invoice" element={<NewInvoice />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
+                <Route path="*" element={<Index />} />
               </Routes>
             </main>
             <CartBottomActions />
