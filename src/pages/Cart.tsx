@@ -10,6 +10,11 @@ const Cart = () => {
   const navigate = useNavigate();
   const { cart, removeFromCart, updateQuantity, getTotalPrice, getTotalItems } = useCart();
 
+  // Helper function to get numeric price value
+  const getNumericPrice = (item: any) => {
+    return item.priceValue || parseFloat(item.price.replace(/[^\d.]/g, '')) || 0;
+  };
+
   if (cart.length === 0) {
     return (
       <div className="min-h-screen bg-background">
@@ -37,7 +42,7 @@ const Cart = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-24">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
@@ -55,68 +60,75 @@ const Cart = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
-            {cart.map((item) => (
-              <Card key={item.id}>
-                <CardContent className="p-6">
-                  <div className="flex gap-4">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-20 h-20 object-cover rounded-lg"
-                    />
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <h3 className="font-semibold text-foreground">{item.name}</h3>
-                          <p className="text-sm text-muted-foreground">{item.brand}</p>
-                          <Badge variant="outline" className="text-xs mt-1">
-                            {item.category}
-                          </Badge>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeFromCart(item.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+            {cart.map((item) => {
+              const itemPrice = getNumericPrice(item);
+              const itemTotal = itemPrice * item.quantity;
+              
+              return (
+                <Card key={item.id}>
+                  <CardContent className="p-6">
+                    <div className="flex gap-4">
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="w-20 h-20 object-cover rounded-lg"
+                      />
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <h3 className="font-semibold text-foreground">{item.name}</h3>
+                            <p className="text-sm text-muted-foreground">{item.brand}</p>
+                            <Badge variant="outline" className="text-xs mt-1">
+                              {item.category}
+                            </Badge>
+                          </div>
                           <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                            className="h-8 w-8 p-0"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeFromCart(item.id)}
+                            className="text-destructive hover:text-destructive"
                           >
-                            <Minus className="w-3 h-3" />
-                          </Button>
-                          <span className="text-sm font-medium min-w-[2ch] text-center">
-                            {item.quantity}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Plus className="w-3 h-3" />
+                            <X className="w-4 h-4" />
                           </Button>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-foreground">KSh {item.price.toLocaleString()}</p>
-                          <p className="text-sm text-muted-foreground">
-                            KSh {(item.price * item.quantity).toLocaleString()} total
-                          </p>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </Button>
+                            <span className="text-sm font-medium min-w-[2ch] text-center">
+                              {item.quantity}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </Button>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-foreground">
+                              KSh {itemPrice.toLocaleString()}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              KSh {itemTotal.toLocaleString()} total
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           {/* Order Summary */}

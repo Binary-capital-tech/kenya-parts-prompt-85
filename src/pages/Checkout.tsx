@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, CreditCard, MapPin, User, Phone, Mail } from "lucide-react";
+import { ArrowLeft, CreditCard, MapPin, User } from "lucide-react";
 import { useCart } from "@/components/CartContext";
 import { useToast } from "@/hooks/use-toast";
 import MpesaPayment from "@/components/MpesaPayment";
@@ -17,7 +17,6 @@ interface CustomerInfo {
   phone: string;
   address: string;
   city: string;
-  postalCode: string;
 }
 
 const Checkout = () => {
@@ -31,9 +30,13 @@ const Checkout = () => {
     email: "",
     phone: "",
     address: "",
-    city: "",
-    postalCode: ""
+    city: ""
   });
+
+  // Helper function to get numeric price value
+  const getNumericPrice = (item: any) => {
+    return item.priceValue || parseFloat(item.price.replace(/[^\d.]/g, '')) || 0;
+  };
 
   const subtotal = getTotalPrice();
   const shipping = 500;
@@ -126,7 +129,7 @@ const Checkout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-24">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
@@ -218,24 +221,14 @@ const Checkout = () => {
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="city">City *</Label>
-                            <Input
-                              id="city"
-                              value={customerInfo.city}
-                              onChange={(e) => setCustomerInfo(prev => ({ ...prev, city: e.target.value }))}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="postalCode">Postal Code</Label>
-                            <Input
-                              id="postalCode"
-                              value={customerInfo.postalCode}
-                              onChange={(e) => setCustomerInfo(prev => ({ ...prev, postalCode: e.target.value }))}
-                            />
-                          </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="city">City *</Label>
+                          <Input
+                            id="city"
+                            value={customerInfo.city}
+                            onChange={(e) => setCustomerInfo(prev => ({ ...prev, city: e.target.value }))}
+                            required
+                          />
                         </div>
                       </div>
 
@@ -279,22 +272,26 @@ const Checkout = () => {
               <CardContent className="space-y-4">
                 {/* Cart Items */}
                 <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {cart.map((item) => (
-                    <div key={item.id} className="flex gap-3 py-2">
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-12 h-12 object-cover rounded"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">{item.brand}</p>
-                        <p className="text-sm">
-                          {item.quantity}x KSh {item.price.toLocaleString()}
-                        </p>
+                  {cart.map((item) => {
+                    const itemPrice = getNumericPrice(item);
+                    
+                    return (
+                      <div key={item.id} className="flex gap-3 py-2">
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-12 h-12 object-cover rounded"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{item.name}</p>
+                          <p className="text-xs text-muted-foreground">{item.brand}</p>
+                          <p className="text-sm">
+                            {item.quantity}x KSh {itemPrice.toLocaleString()}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <Separator />
@@ -318,7 +315,7 @@ const Checkout = () => {
 
                 <div className="pt-4 text-center">
                   <p className="text-xs text-muted-foreground">
-                    💳 Secure payment with M-Pesa
+                    Secure payment with M-Pesa
                   </p>
                 </div>
               </CardContent>
