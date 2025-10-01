@@ -4,7 +4,8 @@ export interface Product {
   id: string;
   name: string;
   brand?: string;
-  price: number;
+  price: string; // Format: "KSh 5,000"
+  priceValue?: number; // Numeric value for calculations
   originalPrice?: number;
   image: string;
   rating?: number;
@@ -50,7 +51,9 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             : item
         );
       } else {
-        return [...prevCart, { ...product, quantity: 1 }];
+        // Ensure priceValue is set when adding to cart
+        const priceValue = product.priceValue || parseFloat(product.price.replace(/[^\d.]/g, '')) || 0;
+        return [...prevCart, { ...product, priceValue, quantity: 1 }];
       }
     });
   };
@@ -64,7 +67,6 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       removeFromCart(productId);
       return;
     }
-    
     setCart(prevCart =>
       prevCart.map(item =>
         item.id === productId
@@ -76,7 +78,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const getTotalPrice = () => {
     return cart.reduce((total, item) => {
-      return total + (item.price * item.quantity);
+      const itemPrice = item.priceValue || parseFloat(item.price.replace(/[^\d.]/g, '')) || 0;
+      return total + (itemPrice * item.quantity);
     }, 0);
   };
 

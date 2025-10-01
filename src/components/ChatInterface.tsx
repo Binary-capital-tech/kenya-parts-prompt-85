@@ -10,6 +10,7 @@ import { Send, Bot, User, ShoppingCart, Star, Minus, Plus, X, ArrowLeft, History
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useCart, Product } from "@/components/CartContext";
+import { useLocation } from "react-router-dom";
 
 interface Message {
   id: string;
@@ -30,6 +31,8 @@ interface ChatSession {
 }
 
 const ChatInterface = () => {
+
+  const location = useLocation();  
   const [bottomOffset, setBottomOffset] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 

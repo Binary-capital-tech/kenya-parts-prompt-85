@@ -1,13 +1,17 @@
 import { ShoppingCart, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useCart } from "@/components/CartContext";
 
 const CartBottomActions = () => {
   const { getTotalItems } = useCart();
   const navigate = useNavigate();
-
-  if (getTotalItems() === 0) return null;
+  const location = useLocation();
+  
+  // Don't show on cart or checkout pages
+  const isCartOrCheckout = location.pathname === '/cart' || location.pathname === '/checkout';
+  
+  if (getTotalItems() === 0 || isCartOrCheckout) return null;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t shadow-lg z-40 p-4">
