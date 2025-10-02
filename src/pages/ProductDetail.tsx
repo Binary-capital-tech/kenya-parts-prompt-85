@@ -92,24 +92,30 @@ const ProductDetail = () => {
     }
   };
 
-  const handleAddToCart = () => {
-    if (!product) return;
-    
-    for (let i = 0; i < selectedQuantity; i++) {
-      addToCart({
-        id: product.id,
-        name: product.name,
-        price: product.sale_price || product.price,
-        image: productImages[selectedImageIndex]?.image_url || '/src/assets/hero-parts.jpg'
-      });
-    }
-    
-    toast({
-      title: "Added to cart!",
-      description: `${selectedQuantity}x ${product.name} added to your cart.`,
+ const handleAddToCart = () => {
+  if (!product) return;
+  
+  const finalPrice = product.sale_price || product.price;
+  
+  for (let i = 0; i < selectedQuantity; i++) {
+    addToCart({
+      id: product.id.toString(), // Ensure string ID
+      name: product.name,
+      brand: product.brand || 'Unknown Brand',
+      price: `KSh ${finalPrice.toLocaleString()}`, // Match ChatInterface format
+      image: productImages[selectedImageIndex]?.image_url || '/src/assets/hero-parts.jpg',
+      rating: product.rating,
+      description: product.description || '',
+      category: product.tags?.[0] || '', // Use first tag as category
+      inStock: product.stock_quantity > 0
     });
-  };
-
+  }
+  
+  toast({
+    title: "Added to cart!",
+    description: `${selectedQuantity}x ${product.name} added to your cart.`,
+  });
+};
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -368,17 +374,12 @@ const ProductDetail = () => {
                   <Button
                     onClick={handleAddToCart}
                     size="lg"
-                    className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
+                    className="flex-1 max-w-xs btn-premium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ShoppingCart className="w-5 h-5 mr-2" />
                     Add to Cart
                   </Button>
-                  <Button variant="outline" size="lg">
-                    <Heart className="w-5 h-5" />
-                  </Button>
-                  <Button variant="outline" size="lg">
-                    <Share2 className="w-5 h-5" />
-                  </Button>
+
                 </div>
 
                 <p className="text-sm text-muted-foreground">

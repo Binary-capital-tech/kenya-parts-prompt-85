@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User, ShoppingCart, Star, Minus, Plus, X, ArrowLeft, History, Trash2, MessageSquare, Zap, Wrench, Droplets, Lightbulb, Wind } from "lucide-react";
+import { Send, Bot, User, ShoppingCart, Star, Minus, Plus, X, ArrowLeft, History, Trash2, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useCart, Product } from "@/components/CartContext";
@@ -48,7 +48,6 @@ const ChatInterface = () => {
         const keyboardVisible = offset > 100;
         setIsKeyboardVisible(keyboardVisible);
         
-        // Position input above keyboard on mobile
         if (keyboardVisible && inputContainerRef.current) {
           const inputRect = inputContainerRef.current.getBoundingClientRect();
           const distanceFromBottom = windowHeight - inputRect.bottom;
@@ -84,11 +83,6 @@ const ChatInterface = () => {
     return saved || 'initial_loading';
   });
   
-  const [showQuickActions, setShowQuickActions] = useState(() => {
-    const saved = sessionStorage.getItem('showQuickActions');
-    return saved !== 'false';
-  });
-  
   const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => {
     const saved = sessionStorage.getItem('chatSessions');
     if (saved) {
@@ -121,10 +115,6 @@ const ChatInterface = () => {
   }, [currentSessionId]);
 
   useEffect(() => {
-    sessionStorage.setItem('showQuickActions', showQuickActions.toString());
-  }, [showQuickActions]);
-
-  useEffect(() => {
     sessionStorage.setItem('chatSessions', JSON.stringify(chatSessions));
   }, [chatSessions]);
   
@@ -141,7 +131,6 @@ const ChatInterface = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Auto-resize textarea
   const adjustTextareaHeight = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -262,7 +251,6 @@ const ChatInterface = () => {
     setCurrentSessionId(tempSessionId);
     setSessionToken('');
     setActiveTab("chat");
-    setShowQuickActions(true);
     setIsLoading(true);
     
     try {
@@ -450,8 +438,7 @@ const ChatInterface = () => {
             image: product.image_url || '/src/assets/hero-parts.jpg',
             rating: product.rating || 4.5,
             description: product.description,
-            category: product.category,
-            inStock: product.in_stock !== false
+            category: product.category
           }));
           
           return {
@@ -532,10 +519,6 @@ const ChatInterface = () => {
 
     setInputValue("");
     setIsLoading(true);
-    
-    if (showQuickActions) {
-      setShowQuickActions(false);
-    }
 
     try {
       const aiResponse = await handleAIResponse(inputValue);
@@ -586,80 +569,6 @@ const ChatInterface = () => {
       e.preventDefault();
       handleSendMessage();
     }
-  };
-
-  const handleSuggestionClick = async (suggestion: string) => {
-    setInputValue("");
-    setShowQuickActions(false);
-    
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: suggestion,
-      timestamp: new Date()
-    };
-
-    setChatSessions(prev => prev.map(session => {
-      if (session.id === currentSessionId) {
-        const updatedMessages = [...session.messages, userMessage];
-        const title = session.title === 'New Chat' || session.title === 'Welcome Chat' 
-          ? generateSessionTitle(suggestion)
-          : session.title;
-        
-        return {
-          ...session,
-          title,
-          messages: updatedMessages,
-          lastActivity: new Date()
-        };
-      }
-      return session;
-    }));
-
-    setIsLoading(true);
-
-    try {
-      const aiResponse = await handleAIResponse(suggestion);
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: aiResponse.content,
-        products: aiResponse.products,
-        timestamp: new Date()
-      };
-
-      setChatSessions(prev => prev.map(session => {
-        if (session.id === currentSessionId) {
-          return {
-            ...session,
-            messages: [...session.messages, assistantMessage],
-            lastActivity: new Date()
-          };
-        }
-        return session;
-      }));
-    } catch (error) {
-      console.error('Error getting AI response:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: "I'm sorry, I encountered an error. Please try again.",
-        timestamp: new Date()
-      };
-      
-      setChatSessions(prev => prev.map(session => {
-        if (session.id === currentSessionId) {
-          return {
-            ...session,
-            messages: [...session.messages, errorMessage],
-            lastActivity: new Date()
-          };
-        }
-        return session;
-      }));
-    }
-    
-    setIsLoading(false);
   };
 
   return (
@@ -715,12 +624,12 @@ const ChatInterface = () => {
                   )}
                 </Button>
               </SheetTrigger>
-              <SheetContent className="w-full sm:w-96">
+              <SheetContent className="w-full sm:w-96 flex flex-col">
                 <SheetHeader>
                   <SheetTitle>Shopping Cart ({getTotalItems()} items)</SheetTitle>
                 </SheetHeader>
-                <div className="flex flex-col h-full">
-                  <div className="flex-1 overflow-y-auto py-4">
+                <div className="flex flex-col flex-1 min-h-0">
+                  <ScrollArea className="flex-1 pr-4">
                     {cart.length === 0 ? (
                       <div className="text-center py-8">
                         <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -728,7 +637,7 @@ const ChatInterface = () => {
                         <p className="text-sm text-muted-foreground">Start chatting to find auto parts!</p>
                       </div>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="space-y-4 py-4">
                         {cart.map((item) => (
                           <Card key={item.id} className="p-4">
                             <div className="flex gap-3">
@@ -775,16 +684,16 @@ const ChatInterface = () => {
                         ))}
                       </div>
                     )}
-                  </div>
+                  </ScrollArea>
                   
-                  {cart.length > 0 && (
-                    <div className="border-t pt-4 space-y-4">
+                  {cart.length > 0 && !isKeyboardVisible && (
+                    <div className="border-t pt-4 mt-4 space-y-4">
                       <div className="flex justify-between items-center font-semibold">
                         <span>Total:</span>
                         <span>KSh {getTotalPrice().toLocaleString()}</span>
                       </div>
                       <Button 
-                        className="flex-1 max-w-xs btn-premium disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full btn-premium"
                         onClick={() => navigate('/checkout', { state: { cart, totalPrice: getTotalPrice() } })}
                       >
                         Proceed to Checkout
@@ -798,8 +707,7 @@ const ChatInterface = () => {
         </div>
       </div>
 
-
-      {/* Main Content - Chat Messages */}
+      {/* Main Content - Chat Messages */}{/* Main Content - Chat Messages */}
       <div className="flex-1 overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
           <TabsContent value="chat" className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 pb-24 sm:pb-28 m-0">
@@ -867,12 +775,11 @@ const ChatInterface = () => {
                                     <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                                       <Button 
                                         size="sm" 
-                                        className="btn-premium disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="btn-premium"
                                         onClick={() => handleAddToCart(product)}
-                                        disabled={!product.inStock}
                                       >
                                         <ShoppingCart className="w-4 h-4 mr-2" />
-                                        {product.inStock ? "Add to Cart" : ""}
+                                        Add to Cart
                                       </Button>
                                     </div>
                                   </div>
@@ -985,9 +892,9 @@ const ChatInterface = () => {
         </Tabs>
       </div>
 
-      {/* Enhanced Input Area - Fixed/Sticky */}
-      {/* Clean Input Area - ChatGPT Style */}
+      {/* Input Area */}
       <div 
+        ref={inputContainerRef}
         className="sticky bottom-0 left-0 right-0 bg-background px-3 sm:px-4 py-3 sm:py-4 z-50" 
         style={{ marginBottom: `${bottomOffset}px` }}
       >
@@ -1026,7 +933,7 @@ const ChatInterface = () => {
           </p>
         </div>
       </div>
-       </div>
+    </div>
   );
 };
 
