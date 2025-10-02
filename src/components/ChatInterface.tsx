@@ -1049,29 +1049,23 @@ const ChatInterface = () => {
       </div>
 
       {/* Enhanced Input Area - Fixed/Sticky */}
+      {/* Clean Input Area - ChatGPT Style */}
       <div 
-        className="sticky bottom-0 left-0 right-0 border-t border-border bg-card/95 backdrop-blur-md px-3 sm:px-4 py-3 shadow-floating z-50" 
+        className="sticky bottom-0 left-0 right-0 bg-background px-3 sm:px-4 py-3 sm:py-4 z-50" 
         style={{ marginBottom: `${bottomOffset}px` }}
       >
-        <div className="max-w-4xl mx-auto">
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <Textarea
-                ref={textareaRef}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyPress}
-                placeholder="Ask for auto parts..."
-                className="w-full resize-none pr-16 bg-background border-border focus:border-primary transition-colors text-sm leading-relaxed min-h-[44px] max-h-32 overflow-y-auto"
-                disabled={isLoading || activeTab !== "chat"}
-                rows={1}
-              />
-              {inputValue.length > 100 && (
-                <div className="absolute bottom-2 right-16 text-xs text-muted-foreground bg-background/80 px-1 rounded">
-                  {inputValue.length}/500
-                </div>
-              )}
-            </div>
+        <div className="max-w-3xl mx-auto">
+          <div className="relative bg-background border border-input rounded-3xl shadow-sm hover:shadow-md transition-shadow focus-within:border-primary focus-within:shadow-md">
+            <Textarea
+              ref={textareaRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyPress}
+              placeholder="Message autospares..."
+              className="w-full resize-none border-0 bg-transparent px-4 py-3 pr-12 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm leading-relaxed min-h-[52px] max-h-32 overflow-y-auto placeholder:text-muted-foreground/60"
+              disabled={isLoading || activeTab !== "chat"}
+              rows={1}
+            />
             <Button
               onClick={handleSendMessage}
               disabled={
@@ -1080,7 +1074,7 @@ const ChatInterface = () => {
                 inputValue.length > 500 ||
                 activeTab !== "chat"
               }
-              className="btn-premium self-end shrink-0 h-11 px-3 sm:px-4 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="absolute right-2 bottom-2 h-8 w-8 p-0 rounded-lg bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground transition-all"
               size="sm"
             >
               {isLoading ? (
@@ -1090,10 +1084,12 @@ const ChatInterface = () => {
               )}
             </Button>
           </div>
-     
+          <p className="text-xs text-muted-foreground/60 text-center mt-2">
+            AI can make mistakes. Verify important information.
+          </p>
         </div>
       </div>
-    </div>
+       </div>
   );
 };
 
