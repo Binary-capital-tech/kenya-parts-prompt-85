@@ -33,8 +33,10 @@ interface ChatSession {
 const ChatInterface = () => {
   const location = useLocation();  
   const [bottomOffset, setBottomOffset] = useState(0);
+
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (window.visualViewport) {
@@ -45,7 +47,18 @@ const ChatInterface = () => {
         
         const keyboardVisible = offset > 100;
         setIsKeyboardVisible(keyboardVisible);
-        setBottomOffset(keyboardVisible ? offset : 0);
+        
+        // Position input above keyboard on mobile
+        if (keyboardVisible && inputContainerRef.current) {
+          const inputRect = inputContainerRef.current.getBoundingClientRect();
+          const distanceFromBottom = windowHeight - inputRect.bottom;
+          
+          if (distanceFromBottom < offset) {
+            inputContainerRef.current.style.transform = `translateY(-${offset}px)`;
+          }
+        } else if (inputContainerRef.current) {
+          inputContainerRef.current.style.transform = 'translateY(0)';
+        }
       };
       
       window.visualViewport.addEventListener("resize", onResize);
@@ -1077,21 +1090,7 @@ const ChatInterface = () => {
               )}
             </Button>
           </div>
-          <div className="flex items-center justify-between mt-2">
-            <p className="text-xs text-muted-foreground">
-              {activeTab === "chat"
-                ? 'Type auto parts, ask questions, or say "invoice" for an example'
-                : "Switch to Chat tab to send messages"}
-            </p>
-            <div className="flex gap-2 text-xs text-muted-foreground">
-              <kbd className="bg-muted px-1.5 py-0.5 rounded border">↵</kbd>
-              <span>to send</span>
-              <kbd className="bg-muted px-1.5 py-0.5 rounded border">Shift</kbd>
-              <span>+</span>
-              <kbd className="bg-muted px-1.5 py-0.5 rounded border">↵</kbd>
-              <span className="hidden sm:inline">new line</span>
-            </div>
-          </div>
+     
         </div>
       </div>
     </div>

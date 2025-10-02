@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,24 @@ import { useCart } from "@/components/CartContext";
 const Cart = () => {
   const navigate = useNavigate();
   const { cart, removeFromCart, updateQuantity, getTotalPrice, getTotalItems } = useCart();
+
+  // Re-sync cart from sessionStorage on mount/refresh
+  useEffect(() => {
+    // The CartContext already handles this, but we can add a verification step
+    const verifyCart = () => {
+      try {
+        const savedCart = sessionStorage.getItem('autospares_cart');
+        if (savedCart) {
+          const parsedCart = JSON.parse(savedCart);
+          console.log('Cart verified on refresh:', parsedCart.length, 'items');
+        }
+      } catch (error) {
+        console.error('Error verifying cart:', error);
+      }
+    };
+    
+    verifyCart();
+  }, []);
 
   // Helper function to get numeric price value
   const getNumericPrice = (item: any) => {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,43 @@ const Checkout = () => {
     address: "",
     city: ""
   });
+
+  // Re-sync cart from sessionStorage on mount/refresh
+  useEffect(() => {
+    const verifyCart = () => {
+      try {
+        const savedCart = sessionStorage.getItem('autospares_cart');
+        if (savedCart) {
+          const parsedCart = JSON.parse(savedCart);
+          console.log('Checkout - Cart verified on refresh:', parsedCart.length, 'items');
+          
+          // If cart is empty in state but exists in storage, trigger a re-render
+          if (cart.length === 0 && parsedCart.length > 0) {
+            console.log('Cart mismatch detected, reloading...');
+            window.location.reload();
+          }
+        }
+      } catch (error) {
+        console.error('Error verifying cart:', error);
+      }
+    };
+    
+    verifyCart();
+  }, [cart.length]);
+
+  // Load customer info from sessionStorage if available
+  useEffect(() => {
+    const savedEmail = sessionStorage.getItem('userEmail');
+    const savedPhone = sessionStorage.getItem('userPhone');
+    
+    if (savedEmail || savedPhone) {
+      setCustomerInfo(prev => ({
+        ...prev,
+        email: savedEmail || prev.email,
+        phone: savedPhone || prev.phone
+      }));
+    }
+  }, []);
 
   // Helper function to get numeric price value
   const getNumericPrice = (item: any) => {
@@ -72,6 +109,11 @@ const Checkout = () => {
       return;
     }
 
+    // Save customer info to sessionStorage
+    sessionStorage.setItem('userEmail', customerInfo.email);
+    sessionStorage.setItem('userPhone', customerInfo.phone);
+    sessionStorage.setItem('customerInfo', JSON.stringify(customerInfo));
+
     setCurrentStep('payment');
   };
 
@@ -80,6 +122,16 @@ const Checkout = () => {
       title: "Order Successful!",
       description: `Your order has been placed successfully. Receipt: ${paymentData.mpesa_receipt_number}`,
     });
+    
+    // Save order to sessionStorage before clearing cart
+    const orderData = {
+      orderDate: new Date().toISOString(),
+      items: cart,
+      customerInfo,
+      total,
+      paymentData
+    };
+    sessionStorage.setItem('lastOrder', JSON.stringify(orderData));
     
     clearCart();
     setCurrentStep('complete');
