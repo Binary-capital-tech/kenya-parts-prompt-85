@@ -1085,7 +1085,7 @@ const ChatInterface = () => {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground/60 text-center mt-2">
-            AI can make mistakes. Verify important information.
+            ask for brakes, batteries and tires
           </p>
         </div>
       </div>

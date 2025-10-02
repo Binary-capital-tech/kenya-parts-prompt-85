@@ -183,7 +183,7 @@ const Cart = () => {
                 
                 <div className="space-y-3 pt-4">
                   <Button 
-                    className="w-full bg-primary hover:bg-primary/90" 
+                    className="w-full btn-premium disabled:opacity-50 disabled:cursor-not-allowed" 
                     size="lg"
                     onClick={() => navigate('/checkout')}
                   >

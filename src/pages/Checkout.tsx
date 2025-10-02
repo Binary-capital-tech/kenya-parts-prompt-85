@@ -283,7 +283,7 @@ const Checkout = () => {
                         </div>
                       </div>
 
-                      <Button type="submit" className="w-full bg-primary hover:bg-primary/90" size="lg">
+                      <Button type="submit" className="w-full btn-premium disabled:opacity-50 disabled:cursor-not-allowed" size="lg">
                         Continue to Payment
                       </Button>
                     </form>

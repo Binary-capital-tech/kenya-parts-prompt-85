@@ -209,7 +209,7 @@ const MpesaPayment = ({
         <Button
           onClick={handlePayment}
           disabled={!phoneNumber || isLoading || paymentStatus === 'success'}
-          className="w-full bg-primary hover:bg-primary/90"
+          className="w-full btn-premium disabled:opacity-50 disabled:cursor-not-allowed"
           size="lg"
         >
           {isLoading ? (
