@@ -31,10 +31,10 @@ interface ChatSession {
 }
 
 const ChatInterface = () => {
-
   const location = useLocation();  
   const [bottomOffset, setBottomOffset] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (window.visualViewport) {
@@ -43,7 +43,6 @@ const ChatInterface = () => {
         const windowHeight = window.innerHeight;
         const offset = windowHeight - viewportHeight;
         
-        // Keyboard is visible if offset is significant (more than 100px)
         const keyboardVisible = offset > 100;
         setIsKeyboardVisible(keyboardVisible);
         setBottomOffset(keyboardVisible ? offset : 0);
@@ -64,7 +63,7 @@ const ChatInterface = () => {
   const { cart, addToCart, removeFromCart, updateQuantity, getTotalPrice, getTotalItems } = useCart();
   
   const [sessionToken, setSessionToken] = useState<string>(() => {
-    return localStorage.getItem('sessionToken') || '';
+    return sessionStorage.getItem('sessionToken') || '';
   });
   
   const [currentSessionId, setCurrentSessionId] = useState<string>(() => {
@@ -73,7 +72,8 @@ const ChatInterface = () => {
   });
   
   const [showQuickActions, setShowQuickActions] = useState(() => {
-    return sessionStorage.getItem('showQuickActions') !== 'false';
+    const saved = sessionStorage.getItem('showQuickActions');
+    return saved !== 'false';
   });
   
   const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => {
@@ -99,7 +99,7 @@ const ChatInterface = () => {
 
   useEffect(() => {
     if (sessionToken) {
-      localStorage.setItem('sessionToken', sessionToken);
+      sessionStorage.setItem('sessionToken', sessionToken);
     }
   }, [sessionToken]);
 
@@ -127,6 +127,19 @@ const ChatInterface = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Auto-resize textarea
+  const adjustTextareaHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      const newHeight = Math.min(textareaRef.current.scrollHeight, 128);
+      textareaRef.current.style.height = `${newHeight}px`;
+    }
+  };
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [inputValue]);
 
   useEffect(() => {
     const initializeSession = async () => {
@@ -357,8 +370,8 @@ const ChatInterface = () => {
     const message = userMessage.toLowerCase();
     
     try {
-      const email = localStorage.getItem('userEmail');
-      const phone = localStorage.getItem('userPhone');
+      const email = sessionStorage.getItem('userEmail');
+      const phone = sessionStorage.getItem('userPhone');
       
       const response = await fetch('https://tlgjxxsscuyrauopinoz.supabase.co/functions/v1/dynamic-api', {
         method: 'POST',
@@ -1023,82 +1036,65 @@ const ChatInterface = () => {
       </div>
 
       {/* Enhanced Input Area - Fixed/Sticky */}
-      <div className="sticky bottom-0 left-0 right-0 border-t border-border bg-card/95 backdrop-blur-md px-3 sm:px-4 py-3 shadow-floating z-50 mb-16" style={{ marginBottom: bottomOffset }}>
-  <div className="max-w-4xl mx-auto">
-   
-   {/* Chat Input Bar */}
-<div
-  className="sticky bottom-0 left-0 right-0 border-t border-border bg-card/95 backdrop-blur-md px-3 sm:px-4 py-3 shadow-floating z-50"
-  style={{ marginBottom: bottomOffset }}
->
-  <div className="max-w-4xl mx-auto flex gap-2">
-    {/* Flexible Textarea */}
-    <div className="flex-1 relative">
-      <Textarea
-        value={inputValue}
-        onChange={(e) => {
-          setInputValue(e.target.value);
-          e.target.style.height = "auto"; // reset
-          e.target.style.height =
-            Math.min(e.target.scrollHeight, 128) + "px"; // grow up to 128px
-        }}
-        onKeyDown={handleKeyPress}
-        placeholder="Ask for auto parts... "
-        className="w-full resize-none pr-16 bg-background border-border focus:border-primary transition-colors text-sm leading-relaxed min-h-[44px] max-h-32 overflow-y-auto"
-        disabled={isLoading || activeTab !== "chat"}
-        rows={1}
-      />
-
-      {/* Character counter */}
-      {inputValue.length > 100 && (
-        <div className="absolute bottom-2 right-16 text-xs text-muted-foreground bg-background/80 px-1 rounded">
-          {inputValue.length}/500
+      <div 
+        className="sticky bottom-0 left-0 right-0 border-t border-border bg-card/95 backdrop-blur-md px-3 sm:px-4 py-3 shadow-floating z-50" 
+        style={{ marginBottom: `${bottomOffset}px` }}
+      >
+        <div className="max-w-4xl mx-auto">
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <Textarea
+                ref={textareaRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder="Ask for auto parts..."
+                className="w-full resize-none pr-16 bg-background border-border focus:border-primary transition-colors text-sm leading-relaxed min-h-[44px] max-h-32 overflow-y-auto"
+                disabled={isLoading || activeTab !== "chat"}
+                rows={1}
+              />
+              {inputValue.length > 100 && (
+                <div className="absolute bottom-2 right-16 text-xs text-muted-foreground bg-background/80 px-1 rounded">
+                  {inputValue.length}/500
+                </div>
+              )}
+            </div>
+            <Button
+              onClick={handleSendMessage}
+              disabled={
+                !inputValue.trim() ||
+                isLoading ||
+                inputValue.length > 500 ||
+                activeTab !== "chat"
+              }
+              className="btn-premium self-end shrink-0 h-11 px-3 sm:px-4 disabled:opacity-50 disabled:cursor-not-allowed"
+              size="sm"
+            >
+              {isLoading ? (
+                <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-xs text-muted-foreground">
+              {activeTab === "chat"
+                ? 'Type auto parts, ask questions, or say "invoice" for an example'
+                : "Switch to Chat tab to send messages"}
+            </p>
+            <div className="flex gap-2 text-xs text-muted-foreground">
+              <kbd className="bg-muted px-1.5 py-0.5 rounded border">↵</kbd>
+              <span>to send</span>
+              <kbd className="bg-muted px-1.5 py-0.5 rounded border">Shift</kbd>
+              <span>+</span>
+              <kbd className="bg-muted px-1.5 py-0.5 rounded border">↵</kbd>
+              <span className="hidden sm:inline">new line</span>
+            </div>
+          </div>
         </div>
-      )}
-    </div>
-
-    {/* Send Button */}
-    <Button
-      onClick={handleSendMessage}
-      disabled={
-        !inputValue.trim() ||
-        isLoading ||
-        inputValue.length > 500 ||
-        activeTab !== "chat"
-      }
-      className="btn-premium self-end shrink-0 h-11 px-3 sm:px-4 disabled:opacity-50 disabled:cursor-not-allowed"
-      size="sm"
-    >
-      {isLoading ? (
-        <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-      ) : (
-        <Send className="w-4 h-4" />
-      )}
-    </Button>
-  </div>
-</div>
-
-
-
-    {/* Hint row */}
-    <div className="flex items-center justify-between mt-2">
-      <p className="text-xs text-muted-foreground">
-        {activeTab === "chat"
-          ? 'Type auto parts, ask questions, or say "invoice" for an example'
-          : "Switch to Chat tab to send messages"}
-      </p>
-      <div className="flex gap-2 text-xs text-muted-foreground">
-        <kbd className="bg-muted px-1.5 py-0.5 rounded border">↵</kbd>
-        <span>to send</span>
-        <kbd className="bg-muted px-1.5 py-0.5 rounded border">Shift</kbd>
-        <span>+</span>
-        <kbd className="bg-muted px-1.5 py-0.5 rounded border">↵</kbd>
-        <span className="hidden sm:inline">new line</span>
       </div>
     </div>
-  </div>
-</div>
- </div>
   );
 };
 

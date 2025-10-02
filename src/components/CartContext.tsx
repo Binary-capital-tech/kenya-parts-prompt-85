@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 export interface Product {
   id: string;
@@ -30,6 +30,8 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
+const CART_STORAGE_KEY = 'autospares_cart';
+
 export const useCart = () => {
   const context = useContext(CartContext);
   if (!context) {
@@ -39,7 +41,27 @@ export const useCart = () => {
 };
 
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [cart, setCart] = useState<CartItem[]>([]);
+  // Initialize cart from sessionStorage
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const savedCart = sessionStorage.getItem(CART_STORAGE_KEY);
+      if (savedCart) {
+        return JSON.parse(savedCart);
+      }
+    } catch (error) {
+      console.error('Error loading cart from storage:', error);
+    }
+    return [];
+  });
+
+  // Persist cart to sessionStorage whenever it changes
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    } catch (error) {
+      console.error('Error saving cart to storage:', error);
+    }
+  }, [cart]);
 
   const addToCart = (product: Product) => {
     setCart(prevCart => {
@@ -89,6 +111,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const clearCart = () => {
     setCart([]);
+    sessionStorage.removeItem(CART_STORAGE_KEY);
   };
 
   return (
