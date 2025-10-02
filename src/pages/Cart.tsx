@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,29 +10,33 @@ import { useCart } from "@/components/CartContext";
 const Cart = () => {
   const navigate = useNavigate();
   const { cart, removeFromCart, updateQuantity, getTotalPrice, getTotalItems } = useCart();
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Re-sync cart from sessionStorage on mount/refresh
+  // Wait for cart to load from sessionStorage
   useEffect(() => {
-    // The CartContext already handles this, but we can add a verification step
-    const verifyCart = () => {
-      try {
-        const savedCart = sessionStorage.getItem('autospares_cart');
-        if (savedCart) {
-          const parsedCart = JSON.parse(savedCart);
-          console.log('Cart verified on refresh:', parsedCart.length, 'items');
-        }
-      } catch (error) {
-        console.error('Error verifying cart:', error);
-      }
-    };
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 100);
     
-    verifyCart();
+    return () => clearTimeout(timer);
   }, []);
 
   // Helper function to get numeric price value
   const getNumericPrice = (item: any) => {
     return item.priceValue || parseFloat(item.price.replace(/[^\d.]/g, '')) || 0;
   };
+
+  // Show loading state while cart is being initialized
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading cart...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (cart.length === 0) {
     return (

@@ -23,6 +23,7 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { cart, getTotalPrice, getTotalItems, clearCart } = useCart();
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState<'info' | 'payment' | 'complete'>('info');
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
     firstName: "",
@@ -33,28 +34,14 @@ const Checkout = () => {
     city: ""
   });
 
-  // Re-sync cart from sessionStorage on mount/refresh
+  // Wait for cart to load from sessionStorage
   useEffect(() => {
-    const verifyCart = () => {
-      try {
-        const savedCart = sessionStorage.getItem('autospares_cart');
-        if (savedCart) {
-          const parsedCart = JSON.parse(savedCart);
-          console.log('Checkout - Cart verified on refresh:', parsedCart.length, 'items');
-          
-          // If cart is empty in state but exists in storage, trigger a re-render
-          if (cart.length === 0 && parsedCart.length > 0) {
-            console.log('Cart mismatch detected, reloading...');
-            window.location.reload();
-          }
-        }
-      } catch (error) {
-        console.error('Error verifying cart:', error);
-      }
-    };
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 100);
     
-    verifyCart();
-  }, [cart.length]);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Load customer info from sessionStorage if available
   useEffect(() => {
@@ -78,6 +65,18 @@ const Checkout = () => {
   const subtotal = getTotalPrice();
   const shipping = 500;
   const total = subtotal + shipping;
+
+  // Show loading state while cart is being initialized
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading checkout...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (cart.length === 0) {
     return (
