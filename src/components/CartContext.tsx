@@ -26,19 +26,22 @@ export interface CartItem extends Product {
 
 interface CartContextType {
   cart: CartItem[];
-  addToCart: (product: Product) => void;
-  removeFromCart: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  addToCart: (product: Product) => Promise<void>;
+  removeFromCart: (productId: string) => Promise<void>;
+  updateQuantity: (productId: string, quantity: number) => Promise<void>;
   getTotalPrice: () => number;
   getTotalItems: () => number;
-  clearCart: () => void;
+  clearCart: () => Promise<void>;
   syncWithBackend: () => Promise<void>;
   isLoading: boolean;
   isSyncing: boolean;
+  isConnected: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
+
 const CART_STORAGE_KEY = 'autospares_cart';
+const WS_URL = 'wss://tlgjxxsscuyrauopinoz.supabase.co/functions/v1/super-endpoint';
 const SUPER_ENDPOINT_URL = 'https://tlgjxxsscuyrauopinoz.supabase.co/functions/v1/super-endpoint';
 const AUTH_TOKEN = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZ2p4eHNzY3V5cmF1b3Bpbm96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxMDk1NzQsImV4cCI6MjA3MzY4NTU3NH0.d3V1ZdSUronzivRV5MlJSU0dFkfHzFKhk-Qgtfikgd0';
 
@@ -54,9 +57,23 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
-  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 10;
   const realtimeChannelRef = useRef<any>(null);
+  const isSelfUpdateRef = useRef(false);
+
+  // Get session info
+  const getSessionInfo = () => {
+    return {
+      sessionToken: sessionStorage.getItem('sessionToken'),
+      sessionId: sessionStorage.getItem('currentSessionId')
+    };
+  };
 
   // Convert backend cart format to frontend format
   const convertBackendToFrontend = (backendItems: any[]): CartItem[] => {
@@ -72,14 +89,12 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }));
   };
 
-  // Load cart from backend
+  // Load cart from backend via HTTP
   const loadCartFromBackend = useCallback(async () => {
     try {
-      const sessionToken = sessionStorage.getItem('sessionToken');
-      const sessionId = sessionStorage.getItem('currentSessionId');
+      const { sessionToken, sessionId } = getSessionInfo();
 
       if (!sessionToken || !sessionId) {
-        // No session yet, load from sessionStorage
         const savedCart = sessionStorage.getItem(CART_STORAGE_KEY);
         if (savedCart) {
           setCart(JSON.parse(savedCart));
@@ -87,7 +102,6 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
       }
 
-      // Fetch cart from backend via super-endpoint
       const response = await fetch(SUPER_ENDPOINT_URL, {
         method: 'POST',
         headers: {
@@ -111,11 +125,125 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     } catch (error) {
       console.error('Error loading cart from backend:', error);
-      // Fallback to sessionStorage
       const savedCart = sessionStorage.getItem(CART_STORAGE_KEY);
       if (savedCart) {
         setCart(JSON.parse(savedCart));
       }
+    }
+  }, []);
+
+  // WebSocket connection setup
+  const connectWebSocket = useCallback(() => {
+    const { sessionToken, sessionId } = getSessionInfo();
+
+    if (!sessionToken || !sessionId) {
+      console.log('No session, skipping WebSocket connection');
+      return;
+    }
+
+    // Clean up existing connection
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    try {
+      const ws = new WebSocket(`${WS_URL}?sessionId=${sessionId}&sessionToken=${sessionToken}`);
+      
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        setIsConnected(true);
+        reconnectAttemptsRef.current = 0;
+
+        // Send initial handshake
+        ws.send(JSON.stringify({
+          type: 'HANDSHAKE',
+          sessionId,
+          sessionToken
+        }));
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          console.log('WebSocket message received:', message);
+
+          switch (message.type) {
+            case 'CART_UPDATED':
+              // Cart was updated by another client or AI
+              if (message.cart?.items) {
+                const frontendCart = convertBackendToFrontend(message.cart.items);
+                setCart(frontendCart);
+                sessionStorage.setItem(CART_STORAGE_KEY, JSON.stringify(frontendCart));
+              }
+              break;
+
+            case 'ITEM_ADDED':
+            case 'ITEM_UPDATED':
+            case 'ITEM_REMOVED':
+            case 'CART_CLEARED':
+              // Reload cart on any cart operation
+              loadCartFromBackend();
+              break;
+
+            case 'PONG':
+              // Keep-alive response
+              break;
+
+            case 'ERROR':
+              console.error('WebSocket error message:', message.error);
+              break;
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setIsConnected(false);
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        setIsConnected(false);
+        wsRef.current = null;
+
+        // Attempt reconnection
+        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
+          console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1})`);
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            reconnectAttemptsRef.current++;
+            connectWebSocket();
+          }, delay);
+        }
+      };
+
+      wsRef.current = ws;
+    } catch (error) {
+      console.error('Error creating WebSocket:', error);
+      setIsConnected(false);
+    }
+  }, [loadCartFromBackend]);
+
+  // Send message via WebSocket with fallback to HTTP
+  const sendWebSocketMessage = useCallback(async (message: any) => {
+    const { sessionToken, sessionId } = getSessionInfo();
+
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      // Send via WebSocket
+      wsRef.current.send(JSON.stringify({
+        ...message,
+        sessionId,
+        sessionToken
+      }));
+      return true;
+    } else {
+      // Fallback to HTTP
+      console.log('WebSocket not available, using HTTP fallback');
+      return false;
     }
   }, []);
 
@@ -131,32 +259,54 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     initialize();
   }, [loadCartFromBackend]);
 
-  // Setup Supabase Realtime subscription for cart changes
+  // Setup WebSocket connection after initial load
   useEffect(() => {
-    const sessionId = sessionStorage.getItem('currentSessionId');
+    if (hasInitialLoad) {
+      connectWebSocket();
+    }
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+    };
+  }, [hasInitialLoad, connectWebSocket]);
+
+  // Setup Supabase Realtime as backup
+  useEffect(() => {
+    const { sessionId } = getSessionInfo();
     
     if (!sessionId || !hasInitialLoad) return;
 
-    // Subscribe to cart changes
     const channel = supabase
-      .channel('cart-realtime')
+      .channel('cart-realtime-backup')
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to INSERT, UPDATE, DELETE
+          event: '*',
           schema: 'public',
           table: 'session_cart_items',
           filter: `session_id=eq.${sessionId}`
         },
         async (payload) => {
-          console.log('Cart changed detected:', payload);
-          // Reload cart from backend when any change is detected
-          await loadCartFromBackend();
+          console.log('Supabase realtime change (backup):', payload);
+          
+          if (isSelfUpdateRef.current) {
+            isSelfUpdateRef.current = false;
+            return;
+          }
+          
+          // Only reload if WebSocket is not connected
+          if (!isConnected) {
+            await loadCartFromBackend();
+          }
         }
       )
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
-      });
+      .subscribe();
 
     realtimeChannelRef.current = channel;
 
@@ -165,124 +315,28 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         supabase.removeChannel(realtimeChannelRef.current);
       }
     };
-  }, [hasInitialLoad, loadCartFromBackend]);
+  }, [hasInitialLoad, isConnected, loadCartFromBackend]);
 
-  // Sync cart to backend (debounced)
-  const syncWithBackend = useCallback(async () => {
-    try {
-      setIsSyncing(true);
-      const sessionToken = sessionStorage.getItem('sessionToken');
-      const sessionId = sessionStorage.getItem('currentSessionId');
-
-      if (!sessionToken || !sessionId) {
-        console.log('No session, skipping backend sync');
-        return;
-      }
-
-      const cartItems = cart.map(item => ({
-        product_id: item.id,
-        product_name: item.name,
-        brand: item.brand || '',
-        quantity: item.quantity,
-        unit_price: item.priceValue || parseFloat(item.price.replace(/[^\d.]/g, '')) || 0,
-        image_url: item.image
-      }));
-
-      const response = await fetch(SUPER_ENDPOINT_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': AUTH_TOKEN
-        },
-        body: JSON.stringify({
-          message: 'SYNC_CART',
-          sessionId,
-          sessionToken,
-          cartItems
-        })
-      });
-
-      if (response.ok) {
-        console.log('Cart synced with backend');
-      }
-    } catch (error) {
-      console.error('Error syncing cart with backend:', error);
-    } finally {
-      setIsSyncing(false);
+  // Save to sessionStorage whenever cart changes
+  useEffect(() => {
+    if (hasInitialLoad) {
+      sessionStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
     }
-  }, [cart]);
+  }, [cart, hasInitialLoad]);
 
-  // Debounced sync on cart changes
+  // WebSocket keep-alive
   useEffect(() => {
-    if (!hasInitialLoad) return;
-
-    // Clear existing timeout
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
-    }
-
-    // Save to sessionStorage immediately
-    sessionStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
-
-    // Schedule backend sync with debounce (2 seconds)
-    syncTimeoutRef.current = setTimeout(() => {
-      syncWithBackend();
-    }, 2000);
-
-    return () => {
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
+    const interval = setInterval(() => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'PING' }));
       }
-    };
-  }, [cart, hasInitialLoad, syncWithBackend]);
+    }, 30000); // Ping every 30 seconds
 
-  // Sync on page visibility change (user switching tabs)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        syncWithBackend();
-      } else if (document.visibilityState === 'visible') {
-        // Reload cart when user comes back to the tab
-        loadCartFromBackend();
-      }
-    };
+    return () => clearInterval(interval);
+  }, []);
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [syncWithBackend, loadCartFromBackend]);
-
-  // Sync before page unload
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      // Force immediate sync (no debounce)
-      const sessionToken = sessionStorage.getItem('sessionToken');
-      const sessionId = sessionStorage.getItem('currentSessionId');
-
-      if (sessionToken && sessionId) {
-        navigator.sendBeacon(
-          SUPER_ENDPOINT_URL,
-          JSON.stringify({
-            message: 'SYNC_CART',
-            sessionId,
-            sessionToken,
-            cartItems: cart.map(item => ({
-              product_id: item.id,
-              product_name: item.name,
-              brand: item.brand || '',
-              quantity: item.quantity,
-              unit_price: item.priceValue || parseFloat(item.price.replace(/[^\d.]/g, '')) || 0,
-              image_url: item.image
-            }))
-          })
-        );
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [cart]);
-
-  const addToCart = (product: Product) => {
+  // Add to cart
+  const addToCart = async (product: Product) => {
     setCart(prevCart => {
       const existingItem = prevCart.find(item => item.id === product.id);
       if (existingItem) {
@@ -296,24 +350,194 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return [...prevCart, { ...product, priceValue, quantity: 1 }];
       }
     });
+
+    try {
+      const { sessionToken, sessionId } = getSessionInfo();
+
+      if (!sessionToken || !sessionId) {
+        return;
+      }
+
+      setIsSyncing(true);
+      isSelfUpdateRef.current = true;
+
+      const priceValue = product.priceValue || parseFloat(product.price.replace(/[^\d.]/g, '')) || 0;
+      
+      const item = {
+        product_id: product.id,
+        product_name: product.name,
+        brand: product.brand || '',
+        quantity: 1,
+        unit_price: priceValue,
+        image_url: product.image
+      };
+
+      // Try WebSocket first
+      const sentViaWS = await sendWebSocketMessage({
+        type: 'ADD_TO_CART',
+        item
+      });
+
+      // Fallback to HTTP if WebSocket failed
+      if (!sentViaWS) {
+        const response = await fetch(SUPER_ENDPOINT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': AUTH_TOKEN
+          },
+          body: JSON.stringify({
+            message: 'ADD_TO_CART',
+            sessionId,
+            sessionToken,
+            item
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to add item');
+        }
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      isSelfUpdateRef.current = false;
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
-  const removeFromCart = (productId: string) => {
+  // Remove from cart
+  const removeFromCart = async (productId: string) => {
     setCart(prevCart => prevCart.filter(item => item.id !== productId));
+
+    try {
+      const { sessionToken, sessionId } = getSessionInfo();
+
+      if (!sessionToken || !sessionId) return;
+
+      setIsSyncing(true);
+      isSelfUpdateRef.current = true;
+
+      const sentViaWS = await sendWebSocketMessage({
+        type: 'REMOVE_FROM_CART',
+        product_id: productId
+      });
+
+      if (!sentViaWS) {
+        await fetch(SUPER_ENDPOINT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': AUTH_TOKEN
+          },
+          body: JSON.stringify({
+            message: 'REMOVE_FROM_CART',
+            sessionId,
+            sessionToken,
+            product_id: productId
+          })
+        });
+      }
+    } catch (error) {
+      console.error('Error removing from cart:', error);
+      isSelfUpdateRef.current = false;
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
-  const updateQuantity = (productId: string, newQuantity: number) => {
+  // Update quantity
+  const updateQuantity = async (productId: string, newQuantity: number) => {
     if (newQuantity === 0) {
-      removeFromCart(productId);
+      await removeFromCart(productId);
       return;
     }
+
     setCart(prevCart =>
       prevCart.map(item =>
-        item.id === productId
-          ? { ...item, quantity: newQuantity }
-          : item
+        item.id === productId ? { ...item, quantity: newQuantity } : item
       )
     );
+
+    try {
+      const { sessionToken, sessionId } = getSessionInfo();
+
+      if (!sessionToken || !sessionId) return;
+
+      setIsSyncing(true);
+      isSelfUpdateRef.current = true;
+
+      const sentViaWS = await sendWebSocketMessage({
+        type: 'UPDATE_QUANTITY',
+        product_id: productId,
+        quantity: newQuantity
+      });
+
+      if (!sentViaWS) {
+        await fetch(SUPER_ENDPOINT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': AUTH_TOKEN
+          },
+          body: JSON.stringify({
+            message: 'UPDATE_QUANTITY',
+            sessionId,
+            sessionToken,
+            product_id: productId,
+            quantity: newQuantity
+          })
+        });
+      }
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+      isSelfUpdateRef.current = false;
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Clear cart
+  const clearCart = async () => {
+    setCart([]);
+    sessionStorage.removeItem(CART_STORAGE_KEY);
+
+    try {
+      const { sessionToken, sessionId } = getSessionInfo();
+
+      if (!sessionToken || !sessionId) return;
+
+      setIsSyncing(true);
+      isSelfUpdateRef.current = true;
+
+      const sentViaWS = await sendWebSocketMessage({
+        type: 'CLEAR_CART'
+      });
+
+      if (!sentViaWS) {
+        await fetch(SUPER_ENDPOINT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': AUTH_TOKEN
+          },
+          body: JSON.stringify({
+            message: 'CLEAR_CART',
+            sessionId,
+            sessionToken
+          })
+        });
+      }
+    } catch (error) {
+      console.error('Error clearing cart:', error);
+      isSelfUpdateRef.current = false;
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const syncWithBackend = async () => {
+    await loadCartFromBackend();
   };
 
   const getTotalPrice = () => {
@@ -327,12 +551,6 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return cart.reduce((total, item) => total + item.quantity, 0);
   };
 
-  const clearCart = () => {
-    setCart([]);
-    sessionStorage.removeItem(CART_STORAGE_KEY);
-    syncWithBackend(); // Sync empty cart to backend
-  };
-
   return (
     <CartContext.Provider value={{
       cart,
@@ -344,7 +562,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       clearCart,
       syncWithBackend,
       isLoading,
-      isSyncing
+      isSyncing,
+      isConnected
     }}>
       {children}
     </CartContext.Provider>
