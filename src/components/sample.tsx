@@ -1,940 +1,855 @@
-import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User, ShoppingCart, Star, Minus, Plus, X, ArrowLeft, History, Trash2, MessageSquare } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
-import { useCart, Product } from "@/components/CartContext";
-import { useLocation } from "react-router-dom";
-
-interface Message {
-  id: string;
-  type: 'user' | 'assistant';
-  content: string;
-  products?: Product[];
-  invoiceData?: any;
-  timestamp: Date;
-}
-
-interface ChatSession {
-  id: string;
-  title: string;
-  messages: Message[];
-  createdAt: Date;
-  lastActivity: Date;
-  sessionToken?: string;
-}
-
-const ChatInterface = () => {
-  const location = useLocation();  
-  const [bottomOffset, setBottomOffset] = useState(0);
-
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const inputContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (window.visualViewport) {
-      const onResize = () => {
-        const viewportHeight = window.visualViewport.height;
-        const windowHeight = window.innerHeight;
-        const offset = windowHeight - viewportHeight;
-        
-        const keyboardVisible = offset > 100;
-        setIsKeyboardVisible(keyboardVisible);
-        
-        if (keyboardVisible && inputContainerRef.current) {
-          const inputRect = inputContainerRef.current.getBoundingClientRect();
-          const distanceFromBottom = windowHeight - inputRect.bottom;
-          
-          if (distanceFromBottom < offset) {
-            inputContainerRef.current.style.transform = `translateY(-${offset}px)`;
-          }
-        } else if (inputContainerRef.current) {
-          inputContainerRef.current.style.transform = 'translateY(0)';
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+};
+const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '');
+// Model Context Protocol - Define available tools
+const MCP_TOOLS = [
+  {
+    name: "get_products",
+    description: "Get list of available auto parts products from the database",
+    parameters: {
+      type: "object",
+      properties: {
+        category: {
+          type: "string",
+          description: "Product category filter"
+        },
+        search: {
+          type: "string",
+          description: "Search term"
+        },
+        limit: {
+          type: "number",
+          description: "Number of products to return (default 10)"
         }
-      };
-      
-      window.visualViewport.addEventListener("resize", onResize);
-      window.visualViewport.addEventListener("scroll", onResize);
-      
-      return () => {
-        window.visualViewport.removeEventListener("resize", onResize);
-        window.visualViewport.removeEventListener("scroll", onResize);
-      };
+      }
     }
-  }, []);
-
-  const { toast } = useToast();
-  const navigate = useNavigate();
-  const { cart, addToCart, removeFromCart, updateQuantity, getTotalPrice, getTotalItems } = useCart();
-  
-  const [sessionToken, setSessionToken] = useState<string>(() => {
-    return sessionStorage.getItem('sessionToken') || '';
-  });
-  
-  const [currentSessionId, setCurrentSessionId] = useState<string>(() => {
-    const saved = sessionStorage.getItem('currentSessionId');
-    return saved || 'initial_loading';
-  });
-  
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => {
-    const saved = sessionStorage.getItem('chatSessions');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed.map((session: any) => ({
-        ...session,
-        createdAt: new Date(session.createdAt),
-        lastActivity: new Date(session.lastActivity),
-        messages: session.messages.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
-        }))
-      }));
+  },
+  {
+    name: "search_products",
+    description: "Search for specific auto parts by name, brand, or description",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Search query for product name, brand, or description"
+        }
+      },
+      required: [
+        "query"
+      ]
     }
-    return [];
-  });
-  
-  const [inputValue, setInputValue] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("chat");
-
-  useEffect(() => {
-    if (sessionToken) {
-      sessionStorage.setItem('sessionToken', sessionToken);
+  },
+  {
+    name: "get_cart_status",
+    description: "Get current cart status for the session - ALWAYS use this when user asks about their cart, checkout, or payment",
+    parameters: {
+      type: "object",
+      properties: {}
     }
-  }, [sessionToken]);
-
-  useEffect(() => {
-    sessionStorage.setItem('currentSessionId', currentSessionId);
-  }, [currentSessionId]);
-
-  useEffect(() => {
-    sessionStorage.setItem('chatSessions', JSON.stringify(chatSessions));
-  }, [chatSessions]);
-  
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const currentSession = chatSessions.find(session => session.id === currentSessionId);
-  const messages = currentSession?.messages || [];
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const adjustTextareaHeight = () => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      const newHeight = Math.min(textareaRef.current.scrollHeight, 128);
-      textareaRef.current.style.height = `${newHeight}px`;
+  },
+  {
+    name: "sync_cart",
+    description: "Sync cart items from frontend to backend database",
+    parameters: {
+      type: "object",
+      properties: {
+        cart_items: {
+          type: "array",
+          description: "Array of cart items to sync",
+          items: {
+            type: "object",
+            properties: {
+              product_id: {
+                type: "string"
+              },
+              product_name: {
+                type: "string"
+              },
+              brand: {
+                type: "string"
+              },
+              quantity: {
+                type: "number"
+              },
+              unit_price: {
+                type: "number"
+              },
+              image_url: {
+                type: "string"
+              }
+            }
+          }
+        }
+      },
+      required: [
+        "cart_items"
+      ]
     }
-  };
-
-  useEffect(() => {
-    adjustTextareaHeight();
-  }, [inputValue]);
-
-  useEffect(() => {
-    const initializeSession = async () => {
-      const initialSession = chatSessions.find(s => s.id === currentSessionId);
-      
-      const needsInitialization = 
-        chatSessions.length === 0 ||
-        currentSessionId === 'initial_loading' ||
-        initialSession?.id === 'temp_initial' || 
-        !initialSession?.sessionToken ||
-        !sessionToken;
-      
-      if (needsInitialization) {
-        try {
-          setIsLoading(true);
-          
-          const response = await fetch('https://tlgjxxsscuyrauopinoz.supabase.co/functions/v1/dynamic-api', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZ2p4eHNzY3V5cmF1b3Bpbm96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxMDk1NzQsImV4cCI6MjA3MzY4NTU3NH0.d3V1ZdSUronzivRV5MlJSU0dFkfHzFKhk-Qgtfikgd0'
-            },
-            body: JSON.stringify({
-              message: 'GET_INITIAL_RECOMMENDATIONS',
-              sessionId: null,
-              sessionToken: null,
-              isInitialLoad: true
-            })
+  },
+  {
+    name: "create_order",
+    description: "Create a new order for the customer",
+    parameters: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          description: "Array of order items with product_id and quantity",
+          items: {
+            type: "object",
+            properties: {
+              product_id: {
+                type: "string"
+              },
+              quantity: {
+                type: "number"
+              }
+            }
+          }
+        },
+        customer_info: {
+          type: "object",
+          description: "Customer information including firstName, lastName, email, phone, address"
+        },
+        total_amount: {        type: "number",
+          description: "Total order amount in KSh"
+        }
+      },
+      required: [
+        "items",
+        "customer_info",
+        "total_amount"
+      ]
+    }
+  },
+  {
+    name: "initiate_mpesa_payment",
+    description: "Initiate M-Pesa payment for an order",
+    parameters: {
+      type: "object",
+      properties: {
+        phone_number: {
+          type: "string",
+          description: "M-Pesa phone number (format: 254XXXXXXXXX)"
+        },
+        amount: {
+          type: "number",
+          description: "Payment amount in KSh"
+        },
+        order_id: {
+          type: "string",
+          description: "Order ID for the payment"
+        }
+      },
+      required: [
+        "phone_number",
+        "amount"
+      ]
+    }
+  }
+];
+// MCP Tool execution with direct database queries
+async function executeMCPTool(toolName, args, sessionId) {
+  console.log(`Executing MCP tool: ${toolName} with args:`, JSON.stringify(args));
+  try {
+    switch(toolName){
+      case "get_products":
+        {
+          const limit = args.limit || 10;
+          let query = supabase.from('products').select('*').limit(limit);
+          if (args.category) {
+            query = query.eq('category_id', args.category);
+          }
+          if (args.search) {
+            query = query.or(`name.ilike.%${args.search}%,brand.ilike.%${args.search}%,description.ilike.%${args.search}%`);
+          }
+          const { data, error } = await query;
+          if (error) {
+            console.error('Error getting products:', error);
+            throw error;
+          }
+          return data || [];
+        }
+      case "search_products":
+        {
+          const searchTerm = args.query;
+          const { data, error } = await supabase.from('products').select('*').or(`name.ilike.%${searchTerm}%,brand.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`).limit(10);
+          if (error) {
+            console.error('Error searching products:', error);
+            throw error;
+          }
+          return data || [];
+        }
+      case "get_cart_status":
+        {
+          const { data: cartItems, error: cartError } = await supabase.from('session_cart_items').select('*').eq('session_id', sessionId).order('created_at', {
+            ascending: true
           });
-
-          if (response.ok) {
-            const data = await response.json();
-            
-            if (data.sessionId && data.sessionToken) {
-              setCurrentSessionId(data.sessionId);
-              setSessionToken(data.sessionToken);
-              
-              const welcomeMessage: Message = {
-                id: Date.now().toString(),
-                type: 'assistant',
-                content: data.response || 'Welcome to AutoSpares Kenya! Here are some popular auto parts to get you started:',
-                products: data.toolResults?.[0]?.result || [],
-                timestamp: new Date()
-              };
-
-              setChatSessions([{
-                id: data.sessionId,
-                title: 'Welcome Chat',
-                createdAt: new Date(),
-                lastActivity: new Date(),
-                sessionToken: data.sessionToken,
-                messages: [welcomeMessage]
-              }]);
-              
-              toast({
-                title: "Session started",
-                description: "AI assistant ready with product recommendations!",
+          if (cartError) {
+            console.error('Error fetching cart:', cartError);
+            throw cartError;
+          }
+          const items = cartItems || [];
+          const totalItems = items.reduce((sum, item)=>sum + item.quantity, 0);
+          const totalValue = items.reduce((sum, item)=>sum + item.unit_price * item.quantity, 0);
+          return {
+            items: items.map((item)=>({
+                product_id: item.product_id,
+                product_name: item.product_name,
+                brand: item.brand,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                total_price: item.unit_price * item.quantity,
+                image_url: item.image_url
+              })),
+            total_items: totalItems,
+            total_value: totalValue,
+            has_items: totalItems > 0,
+            formatted_total: `KSh ${totalValue.toLocaleString()}`
+          };
+        }
+      case "sync_cart":
+        {
+          // Delete existing cart items for this session
+          const { error: deleteError } = await supabase.from('session_cart_items').delete().eq('session_id', sessionId);
+          if (deleteError && deleteError.code !== 'PGRST116') {
+            console.error('Error clearing cart:', deleteError);
+            throw deleteError;
+          }
+          // Insert new cart items if any exist
+          if (args.cart_items && args.cart_items.length > 0) {
+            const cartItems = args.cart_items.map((item)=>({
+                session_id: sessionId,
+                product_id: item.product_id,
+                product_name: item.product_name,
+                brand: item.brand || '',
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                image_url: item.image_url || ''
+              }));
+            const { error: insertError } = await supabase.from('session_cart_items').insert(cartItems);
+            if (insertError) {
+              console.error('Error inserting cart items:', insertError);
+              throw insertError;
+            }
+          }
+          return {
+            success: true,
+            message: `Cart synced successfully with ${args.cart_items?.length || 0} items`,
+            synced_count: args.cart_items?.length || 0
+          };
+        }
+      case "create_order":
+        {
+          const { data: customer, error: customerError } = await supabase.from('customers').insert({
+            full_name: `${args.customer_info.firstName} ${args.customer_info.lastName}`,
+            email: args.customer_info.email,
+            phone: args.customer_info.phone
+          }).select().single();
+          if (customerError) {
+            console.error('Error creating customer:', customerError);
+            throw customerError;
+          }
+          const orderNumber = `ORD-${Date.now()}`;
+          const { data: order, error: orderError } = await supabase.from('orders').insert({
+            customer_id: customer.id,
+            order_number: orderNumber,
+            subtotal: args.total_amount,
+            total_amount: args.total_amount,
+            status: 'pending',
+            shipping_address: args.customer_info.address || args.customer_info,
+            billing_address: args.customer_info.address || args.customer_info
+          }).select().single();
+          if (orderError) {
+            console.error('Error creating order:', orderError);
+            throw orderError;
+          }
+          if (args.items && args.items.length > 0) {
+            const orderItems = args.items.map((item)=>({
+                order_id: order.id,
+                product_id: item.product_id,
+                product_name: item.name || 'Product',
+                product_sku: item.sku || `SKU-${Date.now()}`,
+                quantity: item.quantity,
+                unit_price: item.price || 0,
+                total_price: (item.price || 0) * item.quantity
+              }));
+            const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+            if (itemsError) {
+              console.error('Error creating order items:', itemsError);
+              throw itemsError;
+            }
+          }
+          return {
+            order_id: order.id,
+            order_number: orderNumber,
+            customer_id: customer.id,
+            total_amount: order.total_amount,
+            status: order.status
+          };
+        }
+      case "initiate_mpesa_payment":
+        {
+          const { data: payment, error: paymentError } = await supabase.from('mpesa_payments').insert({
+            phone_number: args.phone_number,
+            amount: args.amount,
+            order_id: args.order_id || null,
+            status: 'pending'
+          }).select().single();
+          if (paymentError) {
+            console.error('Error initiating payment:', paymentError);
+            throw paymentError;
+          }
+          return {
+            payment_id: payment.id,
+            status: 'initiated',
+            message: `M-Pesa payment of KSh ${args.amount.toLocaleString()} initiated to ${args.phone_number}. Please check your phone for the payment prompt.`
+          };
+        }
+      default:
+        throw new Error(`Unknown tool: ${toolName}`);
+    }
+  } catch (error) {
+    console.error(`Error executing tool ${toolName}:`, error);
+    throw error;
+  }
+}
+// Get chat history for context
+async function getChatHistory(sessionId, limit = 10) {
+  try {
+    const { data, error } = await supabase.from('chat_messages').select('message_type, content, metadata').eq('session_id', sessionId).order('created_at', {
+      ascending: true
+    }).limit(limit);
+    if (error) {
+      console.error('Error fetching chat history:', error);
+      return [];
+    }
+    if (!data || data.length === 0) {
+      return [];
+    }
+    const history = [];
+    for (const msg of data){
+      if (msg.message_type === 'user') {
+        history.push({
+          role: 'user',
+          parts: [
+            {
+              text: msg.content
+            }
+          ]
+        });
+      } else if (msg.message_type === 'assistant') {
+        if (msg.metadata && msg.metadata.toolResults && msg.metadata.toolResults.length > 0) {
+          const toolParts = [];
+          for (const toolResult of msg.metadata.toolResults){
+            toolParts.push({
+              functionCall: {
+                name: toolResult.tool,
+                args: toolResult.args || {}
+              }
+            });
+          }
+          if (toolParts.length > 0) {
+            history.push({
+              role: 'model',
+              parts: toolParts
+            });
+            const responseParts = [];
+            for (const toolResult of msg.metadata.toolResults){
+              responseParts.push({
+                functionResponse: {
+                  name: toolResult.tool,
+                  response: {
+                    content: toolResult.result || toolResult.error
+                  }
+                }
               });
             }
-          } else {
-            throw new Error('Failed to initialize session');
+            history.push({
+              role: 'user',
+              parts: responseParts
+            });
           }
-        } catch (error) {
-          console.error('Error initializing session:', error);
-          
-          const fallbackSession: ChatSession = {
-            id: `temp_${Date.now()}`,
-            title: 'Welcome Chat',
-            createdAt: new Date(),
-            lastActivity: new Date(),
-            sessionToken: '',
-            messages: [
-              {
-                id: Date.now().toString(),
-                type: 'assistant',
-                content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
-                timestamp: new Date()
-              }
-            ]
-          };
-          
-          setChatSessions([fallbackSession]);
-          setCurrentSessionId(fallbackSession.id);
-          
-          toast({
-            title: "Connection issue",
-            description: "Please try sending a message to reconnect.",
-            variant: "destructive"
-          });
-        } finally {
-          setIsLoading(false);
         }
+        history.push({
+          role: 'model',
+          parts: [
+            {
+              text: msg.content
+            }
+          ]
+        });
       }
+    }
+    console.log(`Loaded ${history.length} messages from chat history`);
+    return history;
+  } catch (error) {
+    console.error('Error in getChatHistory:', error);
+    return [];
+  }
+}
+// Generate a unique session token
+function generateSessionToken() {
+  const timestamp = Date.now().toString(36);
+  const randomStr = Math.random().toString(36).substring(2, 15);
+  return `session_${timestamp}_${randomStr}`;
+}
+// Enhanced system prompt with cart awareness
+const SYSTEM_PROMPT = `You are an intelligent AI assistant for AutoSpares Kenya, a premium auto parts store. You help customers find the right auto parts for their vehicles using advanced tools and database integration.
+
+CORE CAPABILITIES:
+- Search and recommend auto parts using real product database
+- Track customer cart items and provide cart-aware responses
+- Process orders and handle M-Pesa payments
+- Provide technical specifications and compatibility information
+- Remember conversation context (vehicle models, previous searches, customer preferences, cart contents)
+
+AVAILABLE TOOLS (Model Context Protocol):
+1. get_products - Get list of available products with optional filters
+2. search_products - Search for specific auto parts by name, brand, or description
+3. get_cart_status - Get current cart status (CRITICAL: ALWAYS use when user asks about cart/checkout)
+4. sync_cart - Sync cart items from frontend (automatically called by system)
+5. create_order - Create customer orders with items
+6. initiate_mpesa_payment - Process M-Pesa payments (Kenyan mobile money)
+
+CART AWARENESS - CRITICAL RULES:
+- When users say "what's in my cart", "my cart", "cart contents", "what did I add" → IMMEDIATELY call get_cart_status
+- When users mention "checkout", "payment", "buy now", "proceed to checkout" → First call get_cart_status to confirm items
+- Proactively mention cart when relevant: "I see you have brake pads in your cart..."
+- If cart is empty, guide them: "Your cart is empty. Let me help you find parts!"
+- NEVER assume cart contents - ALWAYS check with get_cart_status first
+
+RESPONSE EXAMPLES:
+User: "What's in my cart?"
+You: [Call get_cart_status] "You have 3 items in your cart:
+• Brake Pads - KSh 5,000 (Qty: 2)
+• Air Filter - KSh 2,500 (Qty: 1)
+Total: KSh 12,500. Ready to proceed to checkout?"
+
+User: "I want to checkout"
+You: [Call get_cart_status first] Then guide based on cart contents
+
+User: "Show me oil filters"
+You: [Call search_products] Present products, and if they have items in cart: "By the way, you currently have 2 items in your cart worth KSh 8,000"
+
+CONTEXT AWARENESS:
+- When a customer mentions a vehicle (e.g., "Toyota Corolla"), remember it for the entire conversation
+- If they ask about different parts (brake pads, then headlights), assume it's for the same vehicle unless specified
+- Reference previous searches and recommendations in your responses
+- Build on previous conversation context naturally
+
+RESPONSE GUIDELINES:
+- Always search the database when customers ask about specific parts
+- Provide detailed product information including compatibility
+- Format product suggestions clearly with prices in KSh
+- Guide customers through the purchase process step by step
+- Only suggest M-Pesa payment (no other payment methods available)
+- Be helpful, professional, and knowledgeable about automotive parts
+
+Remember: You have access to real product data, conversation history, and cart status - always use them to provide accurate, contextual, and personalized responses.`;
+serve(async (req)=>{
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: corsHeaders
+    });
+  }
+  try {
+    const { message, sessionId, sessionToken, email, phone, isInitialLoad, cartItems } = await req.json();
+    console.log('Received chat request:', {
+      message,
+      sessionId,
+      sessionToken,
+      email,
+      phone,
+      isInitialLoad,
+      hasCartItems: !!cartItems
+    });
+    let validSessionToken = sessionToken;
+    let validSessionId = sessionId;
+    // Generate new token if not provided
+    if (!validSessionToken) {
+      validSessionToken = generateSessionToken();
+      console.log('Generated new session token:', validSessionToken);
+    }
+    // Check if session ID is a valid UUID format
+    const isValidUUID = (id)=>{
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(id);
     };
-
-    initializeSession();
-  }, []);
-
-  const generateSessionTitle = (firstUserMessage: string): string => {
-    const words = firstUserMessage.split(' ').slice(0, 6).join(' ');
-    return words.length > 30 ? words.substring(0, 30) + '...' : words;
-  };
-
-  const startNewSession = async () => {
-    const tempSessionId = `temp_${Date.now()}`;
-    
-    setCurrentSessionId(tempSessionId);
-    setSessionToken('');
-    setActiveTab("chat");
-    setIsLoading(true);
-    
-    try {
-      const response = await fetch('https://tlgjxxsscuyrauopinoz.supabase.co/functions/v1/dynamic-api', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZ2p4eHNzY3V5cmF1b3Bpbm96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxMDk1NzQsImV4cCI6MjA3MzY4NTU3NH0.d3V1ZdSUronzivRV5MlJSU0dFkfHzFKhk-Qgtfikgd0'
-        },
-        body: JSON.stringify({
-          message: 'GET_INITIAL_RECOMMENDATIONS',
-          sessionId: null,
-          sessionToken: null,
-          isInitialLoad: true
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        
-        if (data.sessionId && data.sessionToken) {
-          setSessionToken(data.sessionToken);
-          setCurrentSessionId(data.sessionId);
-          
-          const newSession: ChatSession = {
-            id: data.sessionId,
-            title: 'New Chat',
-            createdAt: new Date(),
-            lastActivity: new Date(),
-            sessionToken: data.sessionToken,
-            messages: [
-              {
-                id: Date.now().toString(),
-                type: 'assistant',
-                content: data.response || 'Welcome to AutoSpares Kenya! Here are some popular auto parts:',
-                products: data.toolResults?.[0]?.result || [],
-                timestamp: new Date()
-              }
-            ]
-          };
-          
-          setChatSessions(prev => [newSession, ...prev]);
-          
-          toast({
-            title: "New chat started",
-            description: "Fresh session with product recommendations!",
-          });
-        }
+    // If session ID is not a valid UUID, ignore it
+    if (validSessionId && !isValidUUID(validSessionId)) {
+      console.log(`Invalid session ID format: ${validSessionId}, will create new session`);
+      validSessionId = null;
+    }
+    // Check if session exists by token
+    if (validSessionToken) {
+      const { data: existingSession, error: checkError } = await supabase.from('chat_sessions').select('*').eq('user_token', validSessionToken).single();
+      if (!checkError && existingSession) {
+        validSessionId = existingSession.id;
+        console.log('Found existing session by token:', validSessionId);
       }
-    } catch (error) {
-      console.error('Error creating new session:', error);
-      
-      const newSession: ChatSession = {
-        id: tempSessionId,
-        title: 'New Chat',
-        createdAt: new Date(),
-        lastActivity: new Date(),
-        sessionToken: '',
-        messages: [
+    }
+    // If we have a valid UUID session ID, verify it exists
+    if (validSessionId && isValidUUID(validSessionId)) {
+      const { data: existingById, error: checkByIdError } = await supabase.from('chat_sessions').select('*').eq('id', validSessionId).single();
+      if (checkByIdError || !existingById) {
+        console.log(`Session ID ${validSessionId} not found in database, will create new`);
+        validSessionId = null;
+      }
+    }
+    // If no valid session ID, create new session
+    if (!validSessionId) {
+      const sessionData = {
+        title: isInitialLoad ? 'Welcome Chat' : message.substring(0, 50),
+        user_token: validSessionToken,
+        updated_at: new Date().toISOString()
+      };
+      if (email) sessionData.email = email;
+      if (phone) sessionData.phone = phone;
+      const { data: newSession, error: createError } = await supabase.from('chat_sessions').insert(sessionData).select().single();
+      if (createError) {
+        console.error('Session creation error:', createError);
+        throw createError;
+      }
+      validSessionId = newSession.id;
+      console.log('Created new session with UUID:', validSessionId);
+    } else {
+      // Update existing session
+      const updateData = {
+        title: message.substring(0, 50),
+        updated_at: new Date().toISOString()
+      };
+      if (email) updateData.email = email;
+      if (phone) updateData.phone = phone;
+      const { error: updateError } = await supabase.from('chat_sessions').update(updateData).eq('id', validSessionId);
+      if (updateError) {
+        console.error('Session update error:', updateError);
+      } else {
+        console.log('Updated existing session:', validSessionId);
+      }
+    }
+    // Sync cart if provided
+    if (cartItems && Array.isArray(cartItems) && cartItems.length >= 0) {
+      try {
+        await executeMCPTool('sync_cart', {
+          cart_items: cartItems
+        }, validSessionId);
+        console.log('Cart synced successfully');
+      } catch (error) {
+        console.error('Cart sync error:', error);
+      }
+    }
+    // Handle initial load request - get product recommendations
+    if (isInitialLoad || message === 'GET_INITIAL_RECOMMENDATIONS') {
+      console.log('Handling initial load request for product recommendations');
+      try {
+        const products = await executeMCPTool('get_products', {
+          limit: 10
+        }, validSessionId);
+        const shuffled = products.sort(()=>0.5 - Math.random());
+        const selectedProducts = shuffled.slice(0, 3);
+        const responseText = "Welcome to AutoSpares Kenya! Here are some popular auto parts to get you started. What are you looking for today?";
+        await supabase.from('chat_messages').insert([
           {
-            id: Date.now().toString(),
-            type: 'assistant',
-            content: "Hello! I'm your AI auto parts assistant. What auto parts are you looking for today?",
-            timestamp: new Date()
+            session_id: validSessionId,
+            message_type: 'assistant',
+            content: responseText,
+            metadata: {
+              toolResults: [
+                {
+                  tool: 'get_products',
+                  args: {
+                    limit: 10
+                  },
+                  result: selectedProducts
+                }
+              ]
+            },
+            created_at: new Date().toISOString()
+          }
+        ]);
+        return new Response(JSON.stringify({
+          response: responseText,
+          toolResults: [
+            {
+              tool: 'get_products',
+              args: {
+                limit: 10
+              },
+              result: selectedProducts
+            }
+          ],
+          sessionId: validSessionId,
+          sessionToken: validSessionToken
+        }), {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      } catch (error) {
+        console.error('Error fetching initial products:', error);
+        return new Response(JSON.stringify({
+          response: "Welcome to AutoSpares Kenya! I'm here to help you find the perfect auto parts for your vehicle.",
+          toolResults: [],
+          sessionId: validSessionId,
+          sessionToken: validSessionToken
+        }), {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+    }
+
+    // Handle special cart operation messages
+if (message === 'SYNC_CART' || message === 'GET_CART_STATUS') {
+  console.log(`Handling special cart operation: ${message}`);
+  
+  try {
+    let toolResult;
+    
+    if (message === 'SYNC_CART') {
+      // Sync was already done above, just confirm
+      return new Response(JSON.stringify({
+        response: "Cart synchronized successfully.",
+        toolResults: [],
+        sessionId: validSessionId,
+        sessionToken: validSessionToken
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    if (message === 'GET_CART_STATUS') {
+      // Execute get_cart_status tool
+      toolResult = await executeMCPTool('get_cart_status', {}, validSessionId);
+      
+      let responseText = '';
+      if (toolResult.has_items) {
+        const itemsList = toolResult.items.map((item: any) => 
+          `• ${item.product_name} - KSh ${item.unit_price.toLocaleString()} (Qty: ${item.quantity})`
+        ).join('\n');
+        
+        responseText = `You have ${toolResult.total_items} item(s) in your cart:\n\n${itemsList}\n\nTotal: ${toolResult.formatted_total}`;
+      } else {
+        responseText = "Your cart is currently empty.";
+      }
+      
+      return new Response(JSON.stringify({
+        response: responseText,
+        toolResults: [{
+          tool: 'get_cart_status',
+          args: {},
+          result: toolResult
+        }],
+        sessionId: validSessionId,
+        sessionToken: validSessionToken
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+  } catch (error) {
+    console.error(`Error handling ${message}:`, error);
+    return new Response(JSON.stringify({
+      response: "Error processing cart operation.",
+      toolResults: [],
+      sessionId: validSessionId,
+      sessionToken: validSessionToken
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+    // Get conversation history for context
+    const chatHistory = validSessionId ? await getChatHistory(validSessionId, 10) : [];
+    console.log(`Using ${chatHistory.length} previous messages for context`);
+    // Build contents array with history + new message
+    const contents = [
+      ...chatHistory,
+      {
+        role: 'user',
+        parts: [
+          {
+            text: message
           }
         ]
-      };
-      
-      setChatSessions(prev => [newSession, ...prev]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const deleteSession = (sessionId: string) => {
-    if (chatSessions.length <= 1) {
-      toast({
-        title: "Cannot delete",
-        description: "You must have at least one chat session.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setChatSessions(prev => prev.filter(session => session.id !== sessionId));
-    
-    if (sessionId === currentSessionId) {
-      const remainingSessions = chatSessions.filter(session => session.id !== sessionId);
-      setCurrentSessionId(remainingSessions[0]?.id || '');
-    }
-    
-    toast({
-      title: "Session deleted",
-      description: "Chat session has been removed from history.",
+      }
+    ];
+    // Make request to Gemini API with function calling
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-goog-api-key': Deno.env.get('GEMINI_API_KEY') || ''
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [
+            {
+              text: SYSTEM_PROMPT
+            }
+          ]
+        },
+        contents: contents,
+        tools: [
+          {
+            functionDeclarations: MCP_TOOLS
+          }
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 2048
+        }
+      })
     });
-  };
-
-  const switchToSession = (sessionId: string) => {
-    const session = chatSessions.find(s => s.id === sessionId);
-    if (session?.sessionToken) {
-      setSessionToken(session.sessionToken);
-    } else {
-      setSessionToken('');
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text();
+      console.error('Gemini API error:', geminiResponse.status, errorText);
+      throw new Error(`Gemini API error: ${geminiResponse.status}`);
     }
-    setCurrentSessionId(sessionId);
-    setActiveTab("chat");
-  };
-
-  const handleAddToCart = (product: Product) => {
-    addToCart(product);
-    toast({
-      title: "Added to cart",
-      description: `${product.name} has been added to your cart.`,
-    });
-  };
-
-  const handleAIResponse = async (userMessage: string): Promise<{ content: string; products?: Product[] }> => {
-    const message = userMessage.toLowerCase();
-    
-    try {
-      const email = sessionStorage.getItem('userEmail');
-      const phone = sessionStorage.getItem('userPhone');
-      
-      const response = await fetch('https://tlgjxxsscuyrauopinoz.supabase.co/functions/v1/dynamic-api', {
+    const geminiData = await geminiResponse.json();
+    console.log('Gemini response:', JSON.stringify(geminiData, null, 2));
+    let responseText = '';
+    let toolResults = [];
+    let needsSecondCall = false;
+    // Process Gemini response
+    if (geminiData.candidates && geminiData.candidates[0]) {
+      const candidate = geminiData.candidates[0];
+      if (candidate.content && candidate.content.parts) {
+        for (const part of candidate.content.parts){
+          if (part.functionCall) {
+            const toolName = part.functionCall.name;
+            const args = part.functionCall.args || {};
+            try {
+              const toolResult = await executeMCPTool(toolName, args, validSessionId);
+              toolResults.push({
+                tool: toolName,
+                args: args,
+                result: toolResult
+              });
+              needsSecondCall = true;
+            } catch (error) {
+              console.error(`Error executing tool ${toolName}:`, error);
+              toolResults.push({
+                tool: toolName,
+                args: args,
+                error: error.message
+              });
+            }
+          } else if (part.text) {
+            responseText += part.text;
+          }
+        }
+      }
+    }
+    // If tools were called, make second call to Gemini with results
+    if (needsSecondCall && toolResults.length > 0) {
+      const functionResponses = toolResults.map((result)=>({
+          functionResponse: {
+            name: result.tool,
+            response: {
+              content: result.result || result.error
+            }
+          }
+        }));
+      const secondResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZ2p4eHNzY3V5cmF1b3Bpbm96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxMDk1NzQsImV4cCI6MjA3MzY4NTU3NH0.d3V1ZdSUronzivRV5MlJSU0dFkfHzFKhk-Qgtfikgd0'
+          'X-goog-api-key': Deno.env.get('GEMINI_API_KEY') || ''
         },
         body: JSON.stringify({
-          message: userMessage,
-          sessionId: currentSessionId,
-          sessionToken: sessionToken || undefined,
-          email: email || undefined,
-          phone: phone || undefined
+          systemInstruction: {
+            parts: [
+              {
+                text: SYSTEM_PROMPT
+              }
+            ]
+          },
+          contents: [
+            ...contents,
+            {
+              role: 'model',
+              parts: geminiData.candidates[0].content.parts
+            },
+            {
+              role: 'user',
+              parts: functionResponses
+            }
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 2048
+          }
         })
       });
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.sessionId && data.sessionId !== currentSessionId) {
-        const oldSessionId = currentSessionId;
-        setCurrentSessionId(data.sessionId);
-        
-        setChatSessions(prev => prev.map(session => {
-          if (session.id === oldSessionId) {
-            return {
-              ...session,
-              id: data.sessionId
-            };
-          }
-          return session;
-        }));
-      }
-      
-      if (data.sessionToken && data.sessionToken !== sessionToken) {
-        setSessionToken(data.sessionToken);
-        
-        setChatSessions(prev => prev.map(session => {
-          if (session.id === currentSessionId || session.id === data.sessionId) {
-            return {
-              ...session,
-              sessionToken: data.sessionToken
-            };
-          }
-          return session;
-        }));
-      }
-      
-      if (data.toolResults && data.toolResults.length > 0) {
-        const productResults = data.toolResults.find((result: any) => 
-          result.tool === 'search_products' || result.tool === 'get_products'
-        );
-        
-        if (productResults && Array.isArray(productResults.result)) {
-          const products = productResults.result.map((product: any) => ({
-            id: product.id.toString(),
-            name: product.name,
-            brand: product.brand,
-            price: `KSh ${product.price.toLocaleString()}`,
-            image: product.image_url || '/src/assets/hero-parts.jpg',
-            rating: product.rating || 4.5,
-            description: product.description,
-            category: product.category
-          }));
-          
-          return {
-            content: data.response,
-            products: products
-          };
+      if (secondResponse.ok) {
+        const secondData = await secondResponse.json();
+        console.log('Second Gemini response:', JSON.stringify(secondData, null, 2));
+        if (secondData.candidates && secondData.candidates[0]) {
+          responseText = secondData.candidates[0].content.parts.map((p)=>p.text || '').join('');
         }
       }
-      
-      return {
-        content: data.response || "I'm here to help you find auto parts! What specific parts are you looking for?"
-      };
-      
-    } catch (error) {
-      console.error('AI Response error:', error);
-      
-      if (message.includes('go to cart') || message.includes('navigate to cart') || message.includes('take me to cart') || message.includes('open cart')) {
-        navigate('/cart');
-        return {
-          content: "Taking you to your cart now!"
-        };
-      }
-      
-      if (message.includes('go to checkout') || message.includes('navigate to checkout') || message.includes('take me to checkout') || message.includes('proceed to checkout') || message.includes('checkout now')) {
-        navigate('/checkout');
-        return {
-          content: "Redirecting you to checkout!"
-        };
-      }
-      
-      if (message.includes('cart') || message.includes('shopping cart') || message.includes('my cart')) {
-        if (cart.length === 0) {
-          return {
-            content: "Your cart is currently empty!\n\nStart shopping by asking me about auto parts you need. For example:\n• 'Show me brake pads for Toyota Corolla'\n• 'I need headlights for Honda Civic'\n• 'Find engine oil for BMW'\n\nI'll help you find the perfect parts for your vehicle!"
-          };
-        } else {
-          const cartItems = cart.map(item => `• ${item.name} - ${item.price} (Qty: ${item.quantity})`).join('\n');
-          const totalPrice = getTotalPrice();
-          
-          return {
-            content: `Here's what's in your cart:\n\n${cartItems}\n\n**Total: KSh ${totalPrice.toLocaleString()}**\n\nReady to checkout or need to add more items?`
-          };
-        }
-      }
-      
-      return {
-        content: "I'm here to help you find auto parts! What specific parts are you looking for your vehicle? I can help you find brake pads, air filters, headlights, engine oil, and more."
-      };
     }
-  };
-
-  const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: inputValue,
-      timestamp: new Date()
-    };
-
-    setChatSessions(prev => prev.map(session => {
-      if (session.id === currentSessionId) {
-        const updatedMessages = [...session.messages, userMessage];
-        const title = session.title === 'New Chat' || session.title === 'Welcome Chat' 
-          ? generateSessionTitle(inputValue)
-          : session.title;
-        
-        return {
-          ...session,
-          title,
-          messages: updatedMessages,
-          lastActivity: new Date()
-        };
+    // If no response text, provide default
+    if (!responseText) {
+      responseText = "I'm here to help you find auto parts! What specific parts are you looking for your vehicle?";
+    }
+    // Store chat messages in database
+    if (validSessionId) {
+      const { error: messageError } = await supabase.from('chat_messages').insert([
+        {
+          session_id: validSessionId,
+          message_type: 'user',
+          content: message,
+          created_at: new Date().toISOString()
+        },
+        {
+          session_id: validSessionId,
+          message_type: 'assistant',
+          content: responseText,
+          metadata: {
+            toolResults
+          },
+          created_at: new Date().toISOString()
+        }
+      ]);
+      if (messageError) console.error('Message insert error:', messageError);
+    }
+    return new Response(JSON.stringify({
+      response: responseText,
+      toolResults,
+      sessionId: validSessionId,
+      sessionToken: validSessionToken
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
       }
-      return session;
-    }));
-
-    setInputValue("");
-    setIsLoading(true);
-
-    try {
-      const aiResponse = await handleAIResponse(inputValue);
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: aiResponse.content,
-        products: aiResponse.products,
-        timestamp: new Date()
-      };
-
-      setChatSessions(prev => prev.map(session => {
-        if (session.id === currentSessionId) {
-          return {
-            ...session,
-            messages: [...session.messages, assistantMessage],
-            lastActivity: new Date()
-          };
-        }
-        return session;
-      }));
-    } catch (error) {
-      console.error('Error getting AI response:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: "I'm sorry, I encountered an error. Please try again.",
-        timestamp: new Date()
-      };
-      
-      setChatSessions(prev => prev.map(session => {
-        if (session.id === currentSessionId) {
-          return {
-            ...session,
-            messages: [...session.messages, errorMessage],
-            lastActivity: new Date()
-          };
-        }
-        return session;
-      }));
-    }
-    
-    setIsLoading(false);
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
-  return (
-    <div className="flex flex-col h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-20 border-b bg-card/95 backdrop-blur-sm px-3 sm:px-6 py-3 sm:py-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-hero rounded-lg flex items-center justify-center">
-              <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-sm sm:text-base font-semibold text-primary">autospares</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Find auto parts with AI-powered search</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            {sessionToken && (
-              <Badge variant="secondary" className="text-xs hidden md:flex">
-                Session Active
-              </Badge>
-            )}
-            
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={startNewSession}
-              className="hidden sm:flex"
-            >
-              <MessageSquare className="w-4 h-4 mr-2" />
-              New Chat
-            </Button>
-            
-            <Button 
-              variant={activeTab === "history" ? "default" : "outline"} 
-              size="sm" 
-              onClick={() => setActiveTab(activeTab === "history" ? "chat" : "history")}
-            >
-              <History className="w-4 h-4 mr-1 sm:mr-2" />
-              <span className="hidden xs:inline">History</span>
-            </Button>
-            
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="relative text-xs sm:text-sm">
-                  <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                  <span className="hidden xs:inline">Cart</span>
-                  {getTotalItems() > 0 && (
-                    <Badge className="absolute -top-2 -right-2 bg-kenya-red text-white text-xs min-w-[18px] h-4 flex items-center justify-center rounded-full">
-                      {getTotalItems()}
-                    </Badge>
-                  )}
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="w-full sm:w-96 flex flex-col">
-                <SheetHeader>
-                  <SheetTitle>Shopping Cart ({getTotalItems()} items)</SheetTitle>
-                </SheetHeader>
-                <div className="flex flex-col flex-1 min-h-0">
-                  <ScrollArea className="flex-1 pr-4">
-                    {cart.length === 0 ? (
-                      <div className="text-center py-8">
-                        <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                        <p className="text-muted-foreground">Your cart is empty</p>
-                        <p className="text-sm text-muted-foreground">Start chatting to find auto parts!</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4 py-4">
-                        {cart.map((item) => (
-                          <Card key={item.id} className="p-4">
-                            <div className="flex gap-3">
-                              <img
-                                src={item.image}
-                                alt={item.name}
-                                className="w-16 h-16 object-cover rounded-lg"
-                              />
-                              <div className="flex-1">
-                                <h4 className="font-medium text-sm">{item.name}</h4>
-                                <p className="text-xs text-muted-foreground">{item.brand}</p>
-                                <p className="font-semibold text-sm mt-1">{item.price}</p>
-                                
-                                <div className="flex items-center gap-2 mt-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                    className="h-6 w-6 p-0"
-                                  >
-                                    <Minus className="w-3 h-3" />
-                                  </Button>
-                                  <span className="text-sm min-w-[2ch] text-center">{item.quantity}</span>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                    className="h-6 w-6 p-0"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => removeFromCart(item.id)}
-                                    className="h-6 w-6 p-0 ml-auto text-destructive"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-                  </ScrollArea>
-                  
-                  {cart.length > 0 && !isKeyboardVisible && (
-                    <div className="border-t pt-4 mt-4 space-y-4">
-                      <div className="flex justify-between items-center font-semibold">
-                        <span>Total:</span>
-                        <span>KSh {getTotalPrice().toLocaleString()}</span>
-                      </div>
-                      <Button 
-                        className="w-full btn-premium"
-                        onClick={() => navigate('/checkout', { state: { cart, totalPrice: getTotalPrice() } })}
-                      >
-                        Proceed to Checkout
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content - Chat Messages */}{/* Main Content - Chat Messages */}
-      <div className="flex-1 overflow-hidden">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-          <TabsContent value="chat" className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 pb-24 sm:pb-28 m-0">
-            <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex gap-2 sm:gap-4 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  {message.type === 'assistant' && (
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-hero rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
-                      <Bot className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
-                    </div>
-                  )}
-                  
-                  <div className={`flex flex-col max-w-[85%] sm:max-w-2xl ${message.type === 'user' ? 'items-end' : 'items-start'}`}>
-                    <div
-                      className={`rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base ${
-                        message.type === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted'
-                      }`}
-                    >
-                      <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                    </div>
-                    
-                    {/* Product Cards */}
-                    {message.products && message.products.length > 0 && (
-                      <div className="grid gap-3 sm:gap-4 mt-3 sm:mt-4 w-full">
-                        {message.products.map((product) => (
-                          <Card 
-                            key={product.id} 
-                            className="bg-card border shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer group"
-                            onClick={() => navigate(`/product/${product.id}`)}
-                          >
-                            <CardContent className="p-3 sm:p-4">
-                              <div className="flex gap-3 sm:gap-4">
-                                <div className="relative">
-                                  <img
-                                    src={product.image}
-                                    alt={product.name}
-                                    className="w-16 h-16 sm:w-24 sm:h-24 object-cover rounded-lg group-hover:scale-105 transition-transform duration-200"
-                                  />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-start justify-between mb-1 gap-2">
-                                    <div className="min-w-0 flex-1">
-                                      <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors text-sm sm:text-base truncate">{product.name}</h3>
-                                      <p className="text-xs sm:text-sm text-premium-green font-medium">{product.brand}</p>
-                                    </div>
-                                  </div>
-                                  <p className="text-sm text-muted-foreground mb-2">{product.description}</p>
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <div className="flex items-center gap-1">
-                                      <Star className="w-4 h-4 text-warning fill-current transition-colors" />
-                                      <span className="text-sm font-medium">{product.rating}</span>
-                                    </div>
-                                    <span className="text-xs text-muted-foreground">•</span>
-                                    <span className="text-xs text-muted-foreground">{product.category}</span>
-                                  </div>
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-lg font-bold text-primary">{product.price}</span>
-                                    </div>
-                                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                                      <Button 
-                                        size="sm" 
-                                        className="btn-premium"
-                                        onClick={() => handleAddToCart(product)}
-                                      >
-                                        <ShoppingCart className="w-4 h-4 mr-2" />
-                                        Add to Cart
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-                    
-                    <span className="text-xs text-muted-foreground mt-1">
-                      {new Date(message.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
-
-                  {message.type === 'user' && (
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-premium rounded-lg flex items-center justify-center flex-shrink-0 mt-1 shadow-button transition-all hover:scale-110">
-                      <User className="w-3 h-3 sm:w-5 sm:h-5 text-primary-foreground" />
-                    </div>
-                  )}
-                </div>
-              ))}
-              
-              {isLoading && (
-                <div className="flex gap-4 justify-start animate-fade-in">
-                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-primary rounded-lg flex items-center justify-center shadow-button">
-                    <Bot className="w-3 h-3 sm:w-5 sm:h-5 text-primary-foreground" />
-                  </div>
-                  <div className="bg-card rounded-lg px-4 py-3 shadow-card border border-border">
-                    <div className="loading-dots">
-                      <div></div>
-                      <div></div>
-                      <div></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              <div ref={messagesEndRef} />
-            </div>
-          </TabsContent>
-
-          {/* History Tab */}
-          <TabsContent value="history" className="flex-1 overflow-hidden m-0">
-            <div className="h-full flex flex-col">
-              <div className="border-b px-3 sm:px-6 py-3 sm:py-4 bg-muted/30">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold">Chat History</h2>
-                  <Button variant="outline" size="sm" onClick={startNewSession}>
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    New Chat
-                  </Button>
-                </div>
-              </div>
-              
-              <ScrollArea className="flex-1 p-3 sm:p-6">
-                <div className="space-y-3">
-                  {chatSessions
-                    .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())
-                    .map((session) => (
-                      <Card 
-                        key={session.id} 
-                        className={`cursor-pointer card-interactive animate-fade-in ${
-                          session.id === currentSessionId ? 'ring-2 ring-primary bg-gradient-card shadow-button' : 'hover:shadow-card'
-                        }`}
-                        onClick={() => switchToSession(session.id)}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-medium text-primary truncate mb-1">
-                                {session.title}
-                              </h3>
-                              <p className="text-sm text-muted-foreground mb-2">
-                                {session.messages.length} messages
-                              </p>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <span>Last activity: {new Date(session.lastActivity).toLocaleDateString()}</span>
-                                <span>•</span>
-                                <span>{new Date(session.lastActivity).toLocaleTimeString()}</span>
-                              </div>
-                            </div>
-                            <div className="flex gap-1">
-                              {session.id === currentSessionId && (
-                                <Badge variant="secondary" className="text-xs">
-                                  Active
-                                </Badge>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-destructive hover:text-destructive transition-all hover:scale-110"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteSession(session.id);
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                </div>
-              </ScrollArea>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* Input Area */}
-      <div 
-        ref={inputContainerRef}
-        className="sticky bottom-0 left-0 right-0 bg-background px-3 sm:px-4 py-3 sm:py-4 z-50" 
-        style={{ marginBottom: `${bottomOffset}px` }}
-      >
-        <div className="max-w-3xl mx-auto">
-          <div className="relative bg-background border border-input rounded-3xl shadow-sm hover:shadow-md transition-shadow focus-within:border-primary focus-within:shadow-md">
-            <Textarea
-              ref={textareaRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyPress}
-              placeholder="Message autospares..."
-              className="w-full resize-none border-0 bg-transparent px-4 py-3 pr-12 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm leading-relaxed min-h-[52px] max-h-32 overflow-y-auto placeholder:text-muted-foreground/60"
-              disabled={isLoading || activeTab !== "chat"}
-              rows={1}
-            />
-            <Button
-              onClick={handleSendMessage}
-              disabled={
-                !inputValue.trim() ||
-                isLoading ||
-                inputValue.length > 500 ||
-                activeTab !== "chat"
-              }
-              className="absolute right-2 bottom-2 h-8 w-8 p-0 rounded-lg bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground transition-all"
-              size="sm"
-            >
-              {isLoading ? (
-                <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground/60 text-center mt-2">
-            ask for brakes, batteries and tires
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default ChatInterface;
+    });
+  } catch (error) {
+    console.error('Error in gemini-chat function:', error);
+    return new Response(JSON.stringify({
+      error: error.message,
+      response: "I'm sorry, I encountered an error. Please try again or contact support if the issue persists."
+    }), {
+      status: 500,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
+  }
+});
