@@ -47,6 +47,12 @@ const ChatInterface = () => {
         
         const keyboardVisible = offset > 100;
         setIsKeyboardVisible(keyboardVisible);
+
+        const [showQuickActions, setShowQuickActions] = useState(() => {
+  const saved = sessionStorage.getItem('showQuickActions');
+  return saved !== 'false' && getTotalItems() === 0; // Added cart check
+});
+
         
         // Position input above keyboard on mobile
         if (keyboardVisible && inputContainerRef.current) {
@@ -105,6 +111,8 @@ const ChatInterface = () => {
     }
     return [];
   });
+
+ 
   
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -120,9 +128,16 @@ const ChatInterface = () => {
     sessionStorage.setItem('currentSessionId', currentSessionId);
   }, [currentSessionId]);
 
-  useEffect(() => {
-    sessionStorage.setItem('showQuickActions', showQuickActions.toString());
-  }, [showQuickActions]);
+useEffect(() => {
+  adjustTextareaHeight();
+  
+  // Hide quick actions when there's input or items in cart on mobile
+  if (window.innerWidth < 640) { // sm breakpoint
+    if (inputValue.trim() || getTotalItems() > 0) {
+      setShowQuickActions(false);
+    }
+  }
+}, [inputValue]);
 
   useEffect(() => {
     sessionStorage.setItem('chatSessions', JSON.stringify(chatSessions));
@@ -193,7 +208,7 @@ const ChatInterface = () => {
               const welcomeMessage: Message = {
                 id: Date.now().toString(),
                 type: 'assistant',
-                content: data.response || 'Welcome to AutoSpares Kenya! Here are some popular auto parts to get you started:',
+                content: data.response || 'Welcome to AutoParts Kenya! Here are some popular auto parts to get you started:',
                 products: data.toolResults?.[0]?.result || [],
                 timestamp: new Date()
               };
@@ -297,7 +312,7 @@ const ChatInterface = () => {
               {
                 id: Date.now().toString(),
                 type: 'assistant',
-                content: data.response || 'Welcome to AutoSpares Kenya! Here are some popular auto parts:',
+                content: data.response || 'Welcome to AutoParts Kenya! Here are some popular auto parts:',
                 products: data.toolResults?.[0]?.result || [],
                 timestamp: new Date()
               }
@@ -672,7 +687,7 @@ const ChatInterface = () => {
               <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-sm sm:text-base font-semibold text-primary">autospares</h1>
+              <h1 className="text-sm sm:text-base font-semibold text-primary">AutoParts</h1>
               <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Find auto parts with AI-powered search</p>
             </div>
           </div>
@@ -705,15 +720,20 @@ const ChatInterface = () => {
             
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="relative text-xs sm:text-sm">
-                  <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                  <span className="hidden xs:inline">Cart</span>
-                  {getTotalItems() > 0 && (
-                    <Badge className="absolute -top-2 -right-2 bg-kenya-red text-white text-xs min-w-[18px] h-4 flex items-center justify-center rounded-full">
-                      {getTotalItems()}
-                    </Badge>
-                  )}
-                </Button>
+                <Button 
+  variant="outline" 
+  size="sm" 
+  className="relative text-xs sm:text-sm"
+  onClick={() => navigate('/cart')}
+>
+  <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+  <span className="hidden xs:inline">Cart</span>
+  {getTotalItems() > 0 && (
+    <Badge className="absolute -top-1 -right-1 bg-kenya-red text-grey text-xs min-w-[18px] h-4 flex items-center justify-center rounded-full">
+      {getTotalItems()}
+    </Badge>
+  )}
+</Button>
               </SheetTrigger>
               <SheetContent className="w-full sm:w-96">
                 <SheetHeader>
@@ -802,7 +822,8 @@ const ChatInterface = () => {
       {/* Main Content - Chat Messages */}
       <div className="flex-1 overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-          <TabsContent value="chat" className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 pb-24 sm:pb-28 m-0">
+          
+<TabsContent value="chat" className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 pb-20 m-0">
             <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
               {messages.map((message) => (
                 <div
@@ -987,45 +1008,58 @@ const ChatInterface = () => {
 
       {/* Enhanced Input Area - Fixed/Sticky */}
       {/* Clean Input Area - ChatGPT Style */}
-      <div 
-        className="sticky bottom-0 left-0 right-0 bg-background px-3 sm:px-4 py-3 sm:py-4 z-50" 
-        style={{ marginBottom: `${bottomOffset}px` }}
+     
+     
+<div 
+  className="fixed bottom-0 left-0 right-0 bg-background border-t z-50" 
+  style={{ marginBottom: `${bottomOffset}px` }}
+>
+  {/* Changed from:
+    - sticky to fixed
+    - Removed px-3 sm:px-4 py-3 sm:py-4 (moved inside)
+    - Added border-t
+  */}
+  
+  <div className="max-w-3xl mx-auto px-3 sm:px-4 py-2 sm:py-3">
+    {/* Added py-2 sm:py-3 here instead */}
+    
+    <div className="relative bg-background border border-input rounded-3xl shadow-sm hover:shadow-md transition-shadow focus-within:border-primary focus-within:shadow-md">
+      <Textarea
+        ref={textareaRef}
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={handleKeyPress}
+        placeholder="Message AutoParts..."
+        className="w-full resize-none border-0 bg-transparent px-4 py-3 pr-12 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm leading-relaxed min-h-[52px] max-h-32 overflow-y-auto placeholder:text-muted-foreground/60"
+        disabled={isLoading || activeTab !== "chat"}
+        rows={1}
+      />
+      <Button
+        onClick={handleSendMessage}
+        disabled={
+          !inputValue.trim() ||
+          isLoading ||
+          inputValue.length > 500 ||
+          activeTab !== "chat"
+        }
+        className="absolute right-2 bottom-2 h-8 w-8 p-0 rounded-lg bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground transition-all"
+        size="sm"
       >
-        <div className="max-w-3xl mx-auto">
-          <div className="relative bg-background border border-input rounded-3xl shadow-sm hover:shadow-md transition-shadow focus-within:border-primary focus-within:shadow-md">
-            <Textarea
-              ref={textareaRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyPress}
-              placeholder="Message autospares..."
-              className="w-full resize-none border-0 bg-transparent px-4 py-3 pr-12 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm leading-relaxed min-h-[52px] max-h-32 overflow-y-auto placeholder:text-muted-foreground/60"
-              disabled={isLoading || activeTab !== "chat"}
-              rows={1}
-            />
-            <Button
-              onClick={handleSendMessage}
-              disabled={
-                !inputValue.trim() ||
-                isLoading ||
-                inputValue.length > 500 ||
-                activeTab !== "chat"
-              }
-              className="absolute right-2 bottom-2 h-8 w-8 p-0 rounded-lg bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground transition-all"
-              size="sm"
-            >
-              {isLoading ? (
-                <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground/60 text-center mt-2">
-            ask for brakes, batteries and tires
-          </p>
-        </div>
-      </div>
+        {isLoading ? (
+          <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <Send className="w-4 h-4" />
+        )}
+      </Button>
+    </div>
+    <p className="text-xs text-muted-foreground/60 text-center mt-1.5">
+      {/* Changed from mt-2 to mt-1.5 */}
+      Ask for engines, car accessories or aftermarket parts!
+    </p>
+  </div>
+</div>
+
+
        </div>
   );
 };
