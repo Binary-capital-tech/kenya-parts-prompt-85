@@ -235,7 +235,7 @@ useEffect(() => {
               const welcomeMessage: Message = {
                 id: Date.now().toString(),
                 type: 'assistant',
-                content: data.response || 'Welcome to AutoParts Kenya! Here are some popular auto parts to get you started:',
+                content: data.response || 'Welcome to SokoParts Kenya! Here are some popular auto parts to get you started:',
                 products: data.toolResults?.[0]?.result || [],
                 timestamp: new Date()
               };
@@ -339,7 +339,7 @@ useEffect(() => {
               {
                 id: Date.now().toString(),
                 type: 'assistant',
-                content: data.response || 'Welcome to AutoParts Kenya! Here are some popular auto parts:',
+                content: data.response || 'Welcome to SokoParts Kenya! Here are some popular auto parts:',
                 products: data.toolResults?.[0]?.result || [],
                 timestamp: new Date()
               }
@@ -702,7 +702,7 @@ useEffect(() => {
               <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-sm sm:text-base font-semibold text-primary">AutoParts</h1>
+              <h1 className="text-sm sm:text-base font-semibold text-primary">SokoParts</h1>
               <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Find auto parts with AI-powered search</p>
             </div>
           </div>
@@ -1048,7 +1048,7 @@ useEffect(() => {
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={handleKeyPress}
-        placeholder="Message AutoParts..."
+        placeholder="Message SokoParts..."
         className="w-full resize-none border-0 bg-transparent px-4 py-3 pr-12 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm leading-relaxed min-h-[52px] max-h-32 overflow-y-auto placeholder:text-muted-foreground/60"
         disabled={isLoading || activeTab !== "chat"}
         rows={1}
