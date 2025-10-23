@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,28 +24,111 @@ const MpesaPayment = ({
   const [isLoading, setIsLoading] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState("");
+  const [reference, setReference] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Load saved phone number
+  useEffect(() => {
+    const savedPhone = sessionStorage.getItem('userPhone');
+    if (savedPhone) {
+      setPhoneNumber(savedPhone);
+    }
+  }, []);
 
   const formatPhoneNumber = (phone: string): string => {
     // Remove all non-digits
     const cleaned = phone.replace(/\D/g, '');
     
-    // Format as Kenyan phone number
-    if (cleaned.startsWith('0')) {
-      return `254${cleaned.slice(1)}`;
-    } else if (cleaned.startsWith('254')) {
-      return cleaned;
+    // Format with + prefix for Paystack
+    if (cleaned.startsWith('254')) {
+      return `+${cleaned}`;
+    } else if (cleaned.startsWith('0')) {
+      return `+254${cleaned.slice(1)}`;
     } else if (cleaned.startsWith('7') || cleaned.startsWith('1')) {
-      return `254${cleaned}`;
+      return `+254${cleaned}`;
     }
     
-    return cleaned;
+    return `+254${cleaned}`;
   };
 
   const validatePhoneNumber = (phone: string): boolean => {
-    const formatted = formatPhoneNumber(phone);
-    // Kenyan phone numbers should be 12 digits starting with 254
-    return /^254[17]\d{8}$/.test(formatted);
+    const cleaned = phone.replace(/\D/g, '');
+    // Kenyan phone numbers should be 9-12 digits
+    return cleaned.length >= 9 && cleaned.length <= 12;
+  };
+
+  const verifyPaymentWithPaystack = async (ref: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('paystack-verify', {
+        body: { reference: ref }
+      });
+
+      if (error) throw error;
+
+      if (data.paid) {
+        setPaymentStatus('success');
+        setStatusMessage(`Payment successful! Receipt: ${data.data.reference}`);
+        onPaymentSuccess?.({
+          reference: ref,
+          mpesa_receipt_number: data.data.reference,
+          amount: data.data.amount,
+          ...data.data
+        });
+        
+        toast({
+          title: "Payment Successful",
+          description: `Your payment has been processed. Receipt: ${data.data.reference}`,
+        });
+        return true;
+      } else if (data.data?.status === 'failed') {
+        setPaymentStatus('error');
+        setStatusMessage("Payment failed or was cancelled");
+        onPaymentError?.("Payment failed or was cancelled");
+        toast({
+          title: "Payment Failed",
+          description: "Payment was cancelled or failed",
+          variant: "destructive"
+        });
+        return true;
+      }
+      
+      return false;
+    } catch (error: any) {
+      console.error('Verification error:', error);
+      return false;
+    }
+  };
+
+  const pollPaymentStatus = async (ref: string) => {
+    let attempts = 0;
+    const maxAttempts = 20; // Poll for 60 seconds (3s intervals)
+
+    const checkStatus = async () => {
+      attempts++;
+      
+      const isComplete = await verifyPaymentWithPaystack(ref);
+      
+      if (isComplete) {
+        setIsLoading(false);
+        return;
+      }
+
+      if (attempts < maxAttempts) {
+        setTimeout(checkStatus, 3000); // Check every 3 seconds
+      } else {
+        setIsLoading(false);
+        setPaymentStatus('error');
+        setStatusMessage("Payment verification timed out. Please check your M-Pesa messages.");
+        toast({
+          title: "Verification Timeout",
+          description: "Unable to verify payment. Check your M-Pesa messages.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    // Start polling after a short delay
+    setTimeout(checkStatus, 3000);
   };
 
   const handlePayment = async () => {
@@ -63,11 +146,22 @@ const MpesaPayment = ({
     setStatusMessage("Initiating M-Pesa payment...");
 
     try {
+      // Get customer info from sessionStorage
+      const customerInfoStr = sessionStorage.getItem('customerInfo');
+      const customerInfo = customerInfoStr ? JSON.parse(customerInfoStr) : {};
+      
+      const formattedPhone = formatPhoneNumber(phoneNumber);
+      
       const { data, error } = await supabase.functions.invoke('mpesa-stk-push', {
         body: {
-          phoneNumber: formatPhoneNumber(phoneNumber),
+          phoneNumber: formattedPhone,
           amount: amount,
-          orderId: orderId
+          orderId: orderId || `ORDER-${Date.now()}`,
+          customerInfo: {
+            email: customerInfo.email || 'customer@example.com',
+            firstName: customerInfo.firstName,
+            lastName: customerInfo.lastName
+          }
         }
       });
 
@@ -75,21 +169,24 @@ const MpesaPayment = ({
         throw new Error(error.message);
       }
 
-      if (data.success) {
-        setStatusMessage("Payment request sent! Please check your phone and enter your M-Pesa PIN.");
+      if (data.success && data.reference) {
+        setReference(data.reference);
+        setStatusMessage("Check your phone for M-Pesa prompt and enter your PIN");
+        
         toast({
           title: "Payment Initiated",
           description: "Check your phone for the M-Pesa payment prompt",
         });
 
-        // Poll for payment status
-        pollPaymentStatus(data.paymentId);
+        // Start polling for payment status
+        pollPaymentStatus(data.reference);
       } else {
-        throw new Error(data.error || "Failed to initiate payment");
+        throw new Error(data.message || "Failed to initiate payment");
       }
 
     } catch (error: any) {
       console.error('Payment error:', error);
+      setIsLoading(false);
       setPaymentStatus('error');
       setStatusMessage(error.message || "Payment failed. Please try again.");
       onPaymentError?.(error.message);
@@ -99,60 +196,7 @@ const MpesaPayment = ({
         description: error.message || "Unable to process payment",
         variant: "destructive"
       });
-    } finally {
-      setIsLoading(false);
     }
-  };
-
-  const pollPaymentStatus = async (paymentId: string) => {
-    let attempts = 0;
-    const maxAttempts = 30; // Poll for 2.5 minutes (5s intervals)
-
-    const checkStatus = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('mpesa_payments')
-          .select('status, result_code, result_desc, mpesa_receipt_number')
-          .eq('id', paymentId)
-          .single();
-
-        if (error) throw error;
-
-        if (data.status === 'completed') {
-          setPaymentStatus('success');
-          setStatusMessage(`Payment successful! Receipt: ${data.mpesa_receipt_number}`);
-          onPaymentSuccess?.(data);
-          
-          toast({
-            title: "Payment Successful",
-            description: `Your payment has been processed. Receipt: ${data.mpesa_receipt_number}`,
-          });
-          return;
-        } else if (data.status === 'failed') {
-          setPaymentStatus('error');
-          setStatusMessage(data.result_desc || "Payment failed");
-          onPaymentError?.(data.result_desc || "Payment failed");
-          return;
-        }
-
-        // Continue polling if payment is still pending
-        attempts++;
-        if (attempts < maxAttempts) {
-          setTimeout(checkStatus, 5000); // Check every 5 seconds
-        } else {
-          setPaymentStatus('error');
-          setStatusMessage("Payment verification timed out. Please contact support if money was deducted.");
-        }
-
-      } catch (error: any) {
-        console.error('Status check error:', error);
-        setPaymentStatus('error');
-        setStatusMessage("Unable to verify payment status");
-      }
-    };
-
-    // Start polling after a short delay
-    setTimeout(checkStatus, 3000);
   };
 
   const getStatusIcon = () => {
@@ -200,9 +244,28 @@ const MpesaPayment = ({
         </div>
 
         {paymentStatus !== 'idle' && (
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
             {getStatusIcon()}
-            <p className="text-sm">{statusMessage}</p>
+            <div className="flex-1">
+              <p className="text-sm">{statusMessage}</p>
+              {reference && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Reference: {reference}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {paymentStatus === 'pending' && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 space-y-2">
+            <p className="font-medium text-yellow-900 text-sm">Complete Payment on Your Phone:</p>
+            <ol className="text-xs text-yellow-800 space-y-1 list-decimal list-inside">
+              <li>Check your phone for M-Pesa prompt</li>
+              <li>Enter your M-Pesa PIN</li>
+              <li>Confirm the payment</li>
+              <li>Wait for confirmation</li>
+            </ol>
           </div>
         )}
 
@@ -232,7 +295,7 @@ const MpesaPayment = ({
 
         <div className="text-center">
           <p className="text-xs text-muted-foreground">
-            You will receive an M-Pesa prompt on your phone
+            Secure payment powered by Paystack
           </p>
         </div>
       </CardContent>
