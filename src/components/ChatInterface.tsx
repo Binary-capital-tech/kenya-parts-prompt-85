@@ -31,6 +31,22 @@ interface ChatSession {
 }
 
 const ChatInterface = () => {
+  const parseMarkdown = (text: string): string => {
+  return text
+    // Bold: **text** or __text__
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/__(.+?)__/g, '<strong>$1</strong>')
+    // Italic: *text* or _text_
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/_(.+?)_/g, '<em>$1</em>')
+    // Line breaks
+    .replace(/\n/g, '<br/>')
+    // Bullet points
+    .replace(/^[\-\*]\s(.+)$/gm, '<li>$1</li>')
+    // Wrap lists
+    .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+};
+
   const location = useLocation();  
   const [bottomOffset, setBottomOffset] = useState(0);
 
@@ -47,6 +63,12 @@ const ChatInterface = () => {
         
         const keyboardVisible = offset > 100;
         setIsKeyboardVisible(keyboardVisible);
+
+        const [showQuickActions, setShowQuickActions] = useState(() => {
+  const saved = sessionStorage.getItem('showQuickActions');
+  return saved !== 'false' && getTotalItems() === 0; // Added cart check
+});
+
         
         // Position input above keyboard on mobile
         if (keyboardVisible && inputContainerRef.current) {
@@ -105,6 +127,8 @@ const ChatInterface = () => {
     }
     return [];
   });
+
+ 
   
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -120,9 +144,16 @@ const ChatInterface = () => {
     sessionStorage.setItem('currentSessionId', currentSessionId);
   }, [currentSessionId]);
 
-  useEffect(() => {
-    sessionStorage.setItem('showQuickActions', showQuickActions.toString());
-  }, [showQuickActions]);
+useEffect(() => {
+  adjustTextareaHeight();
+  
+  // Hide quick actions when there's input or items in cart on mobile
+  if (window.innerWidth < 640) { // sm breakpoint
+    if (inputValue.trim() || getTotalItems() > 0) {
+      setShowQuickActions(false);
+    }
+  }
+}, [inputValue]);
 
   useEffect(() => {
     sessionStorage.setItem('chatSessions', JSON.stringify(chatSessions));
@@ -193,7 +224,7 @@ const ChatInterface = () => {
               const welcomeMessage: Message = {
                 id: Date.now().toString(),
                 type: 'assistant',
-                content: data.response || 'Welcome to AutoSpares Kenya! Here are some popular auto parts to get you started:',
+                content: data.response || 'Welcome to AutoParts Kenya! Here are some popular auto parts to get you started:',
                 products: data.toolResults?.[0]?.result || [],
                 timestamp: new Date()
               };
@@ -297,7 +328,7 @@ const ChatInterface = () => {
               {
                 id: Date.now().toString(),
                 type: 'assistant',
-                content: data.response || 'Welcome to AutoSpares Kenya! Here are some popular auto parts:',
+                content: data.response || 'Welcome to AutoParts Kenya! Here are some popular auto parts:',
                 products: data.toolResults?.[0]?.result || [],
                 timestamp: new Date()
               }
@@ -380,128 +411,114 @@ const ChatInterface = () => {
   };
 
   const handleAIResponse = async (userMessage: string): Promise<{ content: string; products?: Product[] }> => {
-    const message = userMessage.toLowerCase();
+  const message = userMessage.toLowerCase();
+  
+  try {
+    const email = sessionStorage.getItem('userEmail');
+    const phone = sessionStorage.getItem('userPhone');
     
-    try {
-      const email = sessionStorage.getItem('userEmail');
-      const phone = sessionStorage.getItem('userPhone');
-      
-      const response = await fetch('https://tlgjxxsscuyrauopinoz.supabase.co/functions/v1/dynamic-api', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZ2p4eHNzY3V5cmF1b3Bpbm96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxMDk1NzQsImV4cCI6MjA3MzY4NTU3NH0.d3V1ZdSUronzivRV5MlJSU0dFkfHzFKhk-Qgtfikgd0'
-        },
-        body: JSON.stringify({
-          message: userMessage,
-          sessionId: currentSessionId,
-          sessionToken: sessionToken || undefined,
-          email: email || undefined,
-          phone: phone || undefined
-        })
-      });
+    const response = await fetch('https://tlgjxxsscuyrauopinoz.supabase.co/functions/v1/dynamic-api', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsZ2p4eHNzY3V5cmF1b3Bpbm96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxMDk1NzQsImV4cCI6MjA3MzY4NTU3NH0.d3V1ZdSUronzivRV5MlJSU0dFkfHzFKhk-Qgtfikgd0'
+      },
+      body: JSON.stringify({
+        message: userMessage,
+        sessionId: currentSessionId,
+        sessionToken: sessionToken || undefined,
+        email: email || undefined,
+        phone: phone || undefined
+      })
+    });
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
 
-      const data = await response.json();
+    const data = await response.json();
+    
+    // Update session IDs
+    if (data.sessionId && data.sessionId !== currentSessionId) {
+      const oldSessionId = currentSessionId;
+      setCurrentSessionId(data.sessionId);
       
-      if (data.sessionId && data.sessionId !== currentSessionId) {
-        const oldSessionId = currentSessionId;
-        setCurrentSessionId(data.sessionId);
-        
-        setChatSessions(prev => prev.map(session => {
-          if (session.id === oldSessionId) {
-            return {
-              ...session,
-              id: data.sessionId
-            };
-          }
-          return session;
-        }));
-      }
-      
-      if (data.sessionToken && data.sessionToken !== sessionToken) {
-        setSessionToken(data.sessionToken);
-        
-        setChatSessions(prev => prev.map(session => {
-          if (session.id === currentSessionId || session.id === data.sessionId) {
-            return {
-              ...session,
-              sessionToken: data.sessionToken
-            };
-          }
-          return session;
-        }));
-      }
-      
-      if (data.toolResults && data.toolResults.length > 0) {
-        const productResults = data.toolResults.find((result: any) => 
-          result.tool === 'search_products' || result.tool === 'get_products'
-        );
-        
-        if (productResults && Array.isArray(productResults.result)) {
-          const products = productResults.result.map((product: any) => ({
-            id: product.id.toString(),
-            name: product.name,
-            brand: product.brand,
-            price: `KSh ${product.price.toLocaleString()}`,
-            image: product.image_url || '/src/assets/hero-parts.jpg',
-            rating: product.rating || 4.5,
-            description: product.description,
-            category: product.category,
-            inStock: product.in_stock !== false
-          }));
-          
-          return {
-            content: data.response,
-            products: products
-          };
+      setChatSessions(prev => prev.map(session => {
+        if (session.id === oldSessionId) {
+          return { ...session, id: data.sessionId };
         }
-      }
+        return session;
+      }));
+    }
+    
+    if (data.sessionToken && data.sessionToken !== sessionToken) {
+      setSessionToken(data.sessionToken);
+      
+      setChatSessions(prev => prev.map(session => {
+        if (session.id === currentSessionId || session.id === data.sessionId) {
+          return { ...session, sessionToken: data.sessionToken };
+        }
+        return session;
+      }));
+    }
+    
+    // ✅ NEW: Check for products in the root-level 'products' array first
+    if (data.products && Array.isArray(data.products) && data.products.length > 0) {
+      const products = data.products.map((product: any) => ({
+        id: product.id.toString(),
+        name: product.name,
+        brand: product.brand,
+        price: `KSh ${Number(product.price).toLocaleString()}`,
+        image: product.imageUrl || '/src/assets/hero-parts.jpg',
+        rating: product.rating || 4.5,
+        description: product.description,
+        category: product.category,
+        inStock: product.inStock !== false
+      }));
       
       return {
-        content: data.response || "I'm here to help you find auto parts! What specific parts are you looking for?"
-      };
-      
-    } catch (error) {
-      console.error('AI Response error:', error);
-      
-      if (message.includes('go to cart') || message.includes('navigate to cart') || message.includes('take me to cart') || message.includes('open cart')) {
-        navigate('/cart');
-        return {
-          content: "Taking you to your cart now!"
-        };
-      }
-      
-      if (message.includes('go to checkout') || message.includes('navigate to checkout') || message.includes('take me to checkout') || message.includes('proceed to checkout') || message.includes('checkout now')) {
-        navigate('/checkout');
-        return {
-          content: "Redirecting you to checkout!"
-        };
-      }
-      
-      if (message.includes('cart') || message.includes('shopping cart') || message.includes('my cart')) {
-        if (cart.length === 0) {
-          return {
-            content: "Your cart is currently empty!\n\nStart shopping by asking me about auto parts you need. For example:\n• 'Show me brake pads for Toyota Corolla'\n• 'I need headlights for Honda Civic'\n• 'Find engine oil for BMW'\n\nI'll help you find the perfect parts for your vehicle!"
-          };
-        } else {
-          const cartItems = cart.map(item => `• ${item.name} - ${item.price} (Qty: ${item.quantity})`).join('\n');
-          const totalPrice = getTotalPrice();
-          
-          return {
-            content: `Here's what's in your cart:\n\n${cartItems}\n\n**Total: KSh ${totalPrice.toLocaleString()}**\n\nReady to checkout or need to add more items?`
-          };
-        }
-      }
-      
-      return {
-        content: "I'm here to help you find auto parts! What specific parts are you looking for your vehicle? I can help you find brake pads, air filters, headlights, engine oil, and more."
+        content: data.response,
+        products: products
       };
     }
-  };
+    
+    // ⚠️ FALLBACK: If no root-level products, check toolResults (old format)
+    if (data.toolResults && data.toolResults.length > 0) {
+      const productResults = data.toolResults.find((result: any) => 
+        result.tool === 'search_products' || result.tool === 'get_products'
+      );
+      
+      if (productResults && Array.isArray(productResults.result)) {
+        const products = productResults.result.map((product: any) => ({
+          id: product.id.toString(),
+          name: product.name,
+          brand: product.brand,
+          price: `KSh ${Number(product.price).toLocaleString()}`,
+          image: product.image_url || '/src/assets/hero-parts.jpg',
+          rating: product.rating || 4.5,
+          description: product.description,
+          category: product.category,
+          inStock: product.in_stock !== false
+        }));
+        
+        return {
+          content: data.response,
+          products: products
+        };
+      }
+    }
+    
+    return {
+      content: data.response || "I'm here to help you find auto parts! What specific parts are you looking for?"
+    };
+    
+  } catch (error) {
+    console.error('AI Response error:', error);
+    
+    // ... rest of your error handling code ...
+  }
+};
+
 
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
@@ -672,7 +689,7 @@ const ChatInterface = () => {
               <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-sm sm:text-base font-semibold text-primary">autospares</h1>
+              <h1 className="text-sm sm:text-base font-semibold text-primary">AutoParts</h1>
               <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Find auto parts with AI-powered search</p>
             </div>
           </div>
@@ -705,15 +722,20 @@ const ChatInterface = () => {
             
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="relative text-xs sm:text-sm">
-                  <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                  <span className="hidden xs:inline">Cart</span>
-                  {getTotalItems() > 0 && (
-                    <Badge className="absolute -top-2 -right-2 bg-kenya-red text-white text-xs min-w-[18px] h-4 flex items-center justify-center rounded-full">
-                      {getTotalItems()}
-                    </Badge>
-                  )}
-                </Button>
+                <Button 
+  variant="outline" 
+  size="sm" 
+  className="relative text-xs sm:text-sm"
+  onClick={() => navigate('/cart')}
+>
+  <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+  <span className="hidden xs:inline">Cart</span>
+  {getTotalItems() > 0 && (
+    <Badge className="absolute -top-1 -right-1 bg-kenya-red text-grey text-xs min-w-[18px] h-4 flex items-center justify-center rounded-full">
+      {getTotalItems()}
+    </Badge>
+  )}
+</Button>
               </SheetTrigger>
               <SheetContent className="w-full sm:w-96">
                 <SheetHeader>
@@ -802,7 +824,8 @@ const ChatInterface = () => {
       {/* Main Content - Chat Messages */}
       <div className="flex-1 overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-          <TabsContent value="chat" className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 pb-24 sm:pb-28 m-0">
+          
+<TabsContent value="chat" className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 pb-20 m-0">
             <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
               {messages.map((message) => (
                 <div
@@ -823,7 +846,11 @@ const ChatInterface = () => {
                           : 'bg-muted'
                       }`}
                     >
-                      <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                      <div 
+  className="whitespace-pre-wrap leading-relaxed prose prose-sm max-w-none"
+  dangerouslySetInnerHTML={{ __html: parseMarkdown(message.content) }}
+/>
+
                     </div>
                     
                     {/* Product Cards */}
@@ -987,45 +1014,58 @@ const ChatInterface = () => {
 
       {/* Enhanced Input Area - Fixed/Sticky */}
       {/* Clean Input Area - ChatGPT Style */}
-      <div 
-        className="sticky bottom-0 left-0 right-0 bg-background px-3 sm:px-4 py-3 sm:py-4 z-50" 
-        style={{ marginBottom: `${bottomOffset}px` }}
+     
+     
+<div 
+  className="fixed bottom-0 left-0 right-0 bg-background border-t z-50" 
+  style={{ marginBottom: `${bottomOffset}px` }}
+>
+  {/* Changed from:
+    - sticky to fixed
+    - Removed px-3 sm:px-4 py-3 sm:py-4 (moved inside)
+    - Added border-t
+  */}
+  
+  <div className="max-w-3xl mx-auto px-3 sm:px-4 py-2 sm:py-3">
+    {/* Added py-2 sm:py-3 here instead */}
+    
+    <div className="relative bg-background border border-input rounded-3xl shadow-sm hover:shadow-md transition-shadow focus-within:border-primary focus-within:shadow-md">
+      <Textarea
+        ref={textareaRef}
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={handleKeyPress}
+        placeholder="Message AutoParts..."
+        className="w-full resize-none border-0 bg-transparent px-4 py-3 pr-12 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm leading-relaxed min-h-[52px] max-h-32 overflow-y-auto placeholder:text-muted-foreground/60"
+        disabled={isLoading || activeTab !== "chat"}
+        rows={1}
+      />
+      <Button
+        onClick={handleSendMessage}
+        disabled={
+          !inputValue.trim() ||
+          isLoading ||
+          inputValue.length > 500 ||
+          activeTab !== "chat"
+        }
+        className="absolute right-2 bottom-2 h-8 w-8 p-0 rounded-lg bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground transition-all"
+        size="sm"
       >
-        <div className="max-w-3xl mx-auto">
-          <div className="relative bg-background border border-input rounded-3xl shadow-sm hover:shadow-md transition-shadow focus-within:border-primary focus-within:shadow-md">
-            <Textarea
-              ref={textareaRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyPress}
-              placeholder="Message autospares..."
-              className="w-full resize-none border-0 bg-transparent px-4 py-3 pr-12 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm leading-relaxed min-h-[52px] max-h-32 overflow-y-auto placeholder:text-muted-foreground/60"
-              disabled={isLoading || activeTab !== "chat"}
-              rows={1}
-            />
-            <Button
-              onClick={handleSendMessage}
-              disabled={
-                !inputValue.trim() ||
-                isLoading ||
-                inputValue.length > 500 ||
-                activeTab !== "chat"
-              }
-              className="absolute right-2 bottom-2 h-8 w-8 p-0 rounded-lg bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground transition-all"
-              size="sm"
-            >
-              {isLoading ? (
-                <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground/60 text-center mt-2">
-            ask for brakes, batteries and tires
-          </p>
-        </div>
-      </div>
+        {isLoading ? (
+          <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <Send className="w-4 h-4" />
+        )}
+      </Button>
+    </div>
+    <p className="text-xs text-muted-foreground/60 text-center mt-1.5">
+      {/* Changed from mt-2 to mt-1.5 */}
+      Ask for engines, car accessories or aftermarket parts!
+    </p>
+  </div>
+</div>
+
+
        </div>
   );
 };
