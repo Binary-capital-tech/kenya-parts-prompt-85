@@ -51,7 +51,7 @@ const MpesaPayment = ({
   const handlePayment = async () => {
     if (!validatePhoneNumber(phoneNumber)) {
       toast({
-        title: "Invalid Phone Number",
+        title: "Invalid Phone Number!",
         description: "Please enter a valid Kenyan phone number (e.g., 0722123456)",
         variant: "destructive"
       });
