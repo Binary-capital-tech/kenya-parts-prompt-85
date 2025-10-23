@@ -160,18 +160,29 @@ useEffect(() => {
   }, [chatSessions]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+const messagesContainerRef = useRef<HTMLDivElement>(null);
+const shouldScrollRef = useRef(true);
+const prevMessagesLengthRef = useRef(0);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
 
-  const currentSession = chatSessions.find(session => session.id === currentSessionId);
-  const messages = currentSession?.messages || [];
+const scrollToBottom = () => {
+  messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+};
 
-  useEffect(() => {
+const currentSession = chatSessions.find(session => session.id === currentSessionId);
+const messages = currentSession?.messages || [];
+
+useEffect(() => {
+  // Only scroll if:
+  // 1. User just sent a message (shouldScrollRef is true)
+  // 2. Messages length increased (new message added)
+  // 3. Not during initial load (prevMessagesLengthRef > 0)
+  if (shouldScrollRef.current && messages.length > prevMessagesLengthRef.current && prevMessagesLengthRef.current > 0) {
     scrollToBottom();
-  }, [messages]);
-
+  }
+  prevMessagesLengthRef.current = messages.length;
+  shouldScrollRef.current = false;
+}, [messages]);
   // Auto-resize textarea
   const adjustTextareaHeight = () => {
     if (textareaRef.current) {
@@ -549,6 +560,7 @@ useEffect(() => {
 
     setInputValue("");
     setIsLoading(true);
+    shouldScrollRef.current = true; // Enable scroll for new messages
     
     if (showQuickActions) {
       setShowQuickActions(false);
@@ -634,6 +646,7 @@ useEffect(() => {
     }));
 
     setIsLoading(true);
+    shouldScrollRef.current = true; // Enable scroll for new messages
 
     try {
       const aiResponse = await handleAIResponse(suggestion);
